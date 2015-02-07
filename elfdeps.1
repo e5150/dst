@@ -1,0 +1,80 @@
+.Dd February 7, 2015
+.Dt ELFDEPS 1 darkstar-tools-14.1
+.Sh NAME
+.Nm elfdeps
+.Nd querys ELF files for NEEDED libraries.
+.Sh SYNOPSIS
+.Nm elfdeps
+.Op Fl vvvv
+.Pa file ...
+.Sh DESCRIPTION
+.Nm
+scans the dynamic section of an ELF file for DT_NEEDED libraries,
+and does a query for the required libraries in the /lib, /usr/lib, 
+/usr/local/lib and /lib64, /usr/lib64, /usr/local/lib64 directories
+for 32 and 64 bit ELF files, respectively. Any DT_RPATH found in the
+dynamic section is also scanned for the libraries.
+Output is formatted as "<file>:<lib>:<path>", where 
+.Pa file
+is the path given as argument, lib is the needed library and path
+is either the path to required library or "missing".
+.Sh ARGUMENTS
+.Bl -tag -width Ds
+.Fl v
+Increase verbosity, may be given multiple times, only for debugging.
+.Sh CAVEATS
+.Nm
+does not actually resolve library dependencies, it ignores
+/etc/ld.so.cache, /etc/ld.so.conf and $LD_LIBRARY_PATH. It is designed
+to sacrifice accuracy for speed. For proper dependency resolution use
+.Xr ldd 1 .
+The program scans each directory only once, multiple 
+.Pa file s
+sharing DT_RPATH, or DT_RPATH containing e.g. /usr/lib64, will not
+incur rescanning of the given directory. Files in a scanned directory
+is regarded as a potential library iff its name contains the string
+".so", they are never
+.Xr stat(2)'ed ,
+so they might be dangling symlinks, sockets, directories, or any
+non-shared-library file possible. The fact that
+.Nm
+claims that a library is either missing or found at some particular
+path does not answer wheter or not a library dependency is actually
+satisfied, but hopefully it should give an accrurate picture in most cases.
+.Sh EXAMPLE
+Find files with unsatified dependencies (with aforementioned caveats)
+.Bd -literal -offset indent
+$ find / -xdev -type f -perm -100 -exec elfdeps {} + 2>/dev/null | grep :missing$
+.Sh BUGS
+DT_RPATH is (allegedly) deprecated, DT_RUNPATH should be queried as well,
+but isn't.
+.Sh AUTHOR
+Written by Lars Lindqvist.
+.Sh COPYRIGHT
+Copyright (C) 2013-2014 Lars Lindqvist
+.Sh LICENSE
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+.Sh WARRANTY
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+.Sh SEE ALSE
+.Xr ldd 1 ,
+.Xr readelf 1 ,
+.Xr objdump 1 ,
+.Xr elf 5 ,
+.Xr ld.so 8 ,

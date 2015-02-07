@@ -1,0 +1,74 @@
+.Dd September 9, 2013
+.Dt CUFGF 1 darkstar-tools-14.0
+.Sh NAME
+.Nm cugfd
+.Nd change user/group/file/directory ownership and permissions
+.Sh SYNOPSIS
+.Nm
+.Op Fl KDq
+.Op Fl u Ar user
+.Op Fl g Ar group
+.Op Fl f Ar file-mode
+.Op Fl d Ar dir-mode
+.Pa path ...
+
+.Sh DESCRIPTION
+.Nm
+recursively changes ownership and/or permissions on files and directories.
+At least one of
+.Fl u ,
+.Fl g ,
+.Fl f 
+or
+.Fl d
+must be given for any changes to be made, if either option is not given,
+the corresponding owership/permissions will be left unchanged.
+
+By default, the executable bit will be kept for those with read access.
+.Sh OPTIONS
+.Bl -tag -width Ds
+.It Fl u Ar user
+Change user ownership to
+.Ar user .
+.It Fl g Ar group
+Change group ownership to
+.Ar group .
+.It Fl f Ar file-mode
+Change mode of regular files to the octal 
+.Ar file-mode .
+.It Fl d Ar dir-mode
+Change mode of directories to the octal 
+.Ar dir-mode .
+.It Fl K
+Don't keep executable bit on regular files.
+.It Fl D
+Dry run, don't do any changes.
+.It Fl q
+Quiet operation, only print warnings and errors.
+.Sh AUTHOR
+Written by Lars Lindqvist.
+.Sh COPYRIGHT
+Copyright (C) 2012-2013 Lars Lindqvist
+.Sh LICENSE
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+.Sh WARRANTY
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+.Sh SEE ALSE
+.Xr chmod 1 ,
+.Xr chown 1 ,

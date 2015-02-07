@@ -1,0 +1,9 @@
+darkstar-installed - querys the database for installed packages
+darkstar-notinpkg - compares files in database and on system
+darkstar-packcontent - prints content of installed packages
+darkstar-packname - extract package information from filename
+mkslack-desc - creates compliant slack-desc
+elfdeps - querys ELF-files for needed libraries.
+cugfd - change user/group/file/directory ownership and permissions
+
+https://github.com/e5150/dst
