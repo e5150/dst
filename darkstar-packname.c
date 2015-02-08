@@ -23,7 +23,8 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "util.h"
+#include "packname.h"
+#include "arg.h"
 
 void
 usage() {

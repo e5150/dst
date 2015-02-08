@@ -26,7 +26,8 @@
 #include <unistd.h>
 #include <dirent.h>
 
-#include "util.h"
+#include "arg.h"
+#include "packname.h"
 
 #define ADM_DIR "/var/log/packages"
 

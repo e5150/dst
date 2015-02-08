@@ -18,7 +18,7 @@ CPPSRC = elfdeps.cc
 SHSRC = darkstar-notinpkg.sh \
         mkslack-desc.sh
 
-HDR=util.h
+HDR=packname.h arg.h
 
 EXEBIN=$(LLTSRC:.c=)   $(CPPSRC:.cc=)    $(SHSRC:.sh=)
 ALLMAN=$(LLTSRC:.c=.1) $(CPPSRC:.cc=.1)  $(SHSRC:.sh=.1)

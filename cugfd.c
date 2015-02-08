@@ -34,7 +34,7 @@
 #include <grp.h>
 #include <errno.h>
 
-#include "util.h"
+#include "arg.h"
 
 int dry_run = 0;
 int verbose = 1;

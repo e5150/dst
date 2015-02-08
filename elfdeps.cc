@@ -31,9 +31,7 @@
 #include <limits.h>
 #include <stdlib.h>
 
-extern "C" {
-	#include "util.h"
-}
+#include "arg.h"
 
 const char *LIB64DIRS[] = {
 	"/usr/local/lib64",

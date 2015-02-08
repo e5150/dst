@@ -31,7 +31,8 @@
 #include <string.h>
 #include <limits.h>
 
-#include "util.h"
+#include "arg.h"
+#include "packname.h"
 
 void
 usage() {
