@@ -1,5 +1,5 @@
 VERSION=14.1
-CFLAGS=-g -ansi -fPIC -O3 -I. -Wall -Wextra -Werror -pedantic -Wno-parentheses
+CFLAGS=-D_XOPEN_SOURCE=500 -g -ansi -fPIC -O3 -I. -Wall -Wextra -Werror -pedantic -Wno-parentheses
 LDFLAGS=
 CC=gcc
 CPP=g++
@@ -66,5 +66,5 @@ pkg: all
 	make install PREFIX=/usr DESTDIR=/tmp/package-dst
 	strip --strip-unneeded /tmp/package-dst/usr/bin/* 2>/dev/null || true
 	gzip /tmp/package-dst/usr/man/man1/*
-	/tmp/package-dst/usr/bin/mkslack-desc darkstar-tools "small collection of slackware related programs" < README > /tmp/package-dst/install/slack-desc
+	/tmp/package-dst/usr/bin/mkslack-desc darkstar-tools "small collection of slackware related programs" < desc > /tmp/package-dst/install/slack-desc
 	cd /tmp/package-dst ; makepkg -l y -c y /tmp/darkstar-tools-$(VERSION)-$(shell uname -m)-1.tgz

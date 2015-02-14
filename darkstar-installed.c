@@ -1,5 +1,4 @@
-/*
- * Copyright © 2012-2014 Lars Lindqvist
+/* Copyright © 2012-2014 Lars Lindqvist
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -20,14 +19,14 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#define _XOPEN_SOURCE 500
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <errno.h>
 
+#include "dst.h"
 #include "arg.h"
-#include "packname.h"
 
 #define ADM_DIR "/var/log/packages"
 
@@ -51,8 +50,8 @@ populate() {
 	struct Pkg *pkg = NULL;
 
 	if(!(dp = opendir(ADM_DIR))) {
-		fprintf(stderr, "%s: FATAL: opendir %s: ", argv0, ADM_DIR);
-		perror(NULL);
+		fprintf(stderr, "%s: FATAL: opendir %s: %s\n", argv0, ADM_DIR, strerror(errno));
+		exit(1);
 	}
 
 	while((dc = readdir(dp))) {
@@ -63,7 +62,10 @@ populate() {
 		head = pkg;
 	}
 
-	closedir(dp);
+	if(closedir(dp) == -1) {
+		fprintf(stderr, "%s: FATAL: closedir %s: %s", argv0, ADM_DIR, strerror(errno));
+		exit(1);
+	}
 
 	return 0;
 }
@@ -118,7 +120,7 @@ main(int argc, char *argv[]) {
 	for(i = 0; i < argc; ++i) {
 		name = dst_packname(argv[i], SPKG_BASE);
 		if(!name) {
-			fprintf(stderr, "%s: ERROR: unable to parse %s\n", argv0, argv[i]);
+			fprintf(stderr, "%s: ERROR: Unable to parse %s\n", argv0, argv[i]);
 			continue;
 		}
 		pkg = find_pkg(name);

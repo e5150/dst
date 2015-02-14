@@ -1,5 +1,4 @@
-/*
- * Copyright © 2013-2015 Lars Lindqvist
+/* Copyright © 2012,2013,2015 Lars Lindqvist
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -19,9 +18,6 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-
-/* Requires: https://github.com/serge1/ELFIO */
-
 #include <iostream>
 #include <vector>
 #include <elfio/elfio.hpp>
@@ -83,8 +79,7 @@ read_libdir(struct Libdir **head, const char *path) {
 		fprintf(stderr, "%s: %s/: listing\n", argv0, path);
 
 	if(!(dp = opendir(path))) {
-		fprintf(stderr, "%s: %s/: ERROR: opendir: ", argv0, path);
-		perror(NULL);
+		fprintf(stderr, "%s: ERROR: opendir %s %s\n", argv0, path, strerror(errno));
 		return 1;
 	}
 
@@ -110,7 +105,9 @@ read_libdir(struct Libdir **head, const char *path) {
 		libdir->head = sofile;
 	}
 
-	closedir(dp);
+	if(closedir(dp) == -1) {
+		fprintf(stderr, "%s: ERROR: closedir %s: %s\n", argv0, path, strerror(errno));
+	}
 
 	libdir->next = *head;
 	*head = libdir;
@@ -156,8 +153,7 @@ read_rpath(const char *rpath, struct Elffile *elffile) {
 	}
 
 	if(!(respath = realpath(path, NULL))) {
-		fprintf(stderr, "%s: %s: could not resolve rpath %s: ", argv0, elffile->path, path);
-		perror(NULL);
+		fprintf(stderr, "%s: %s: could not resolve rpath %s: %s\n", argv0, elffile->path, path, strerror(errno));
 		return "";
 	}
 	strncpy(path, respath, PATH_MAX - 1);
@@ -295,8 +291,7 @@ read_elf(const char *path) {
 		if(fp)
 			fclose(fp);
 		if(errno) {
-			fprintf(stderr, "%s: %s: ERROR: ", argv0, path);
-			perror(NULL);
+			fprintf(stderr, "%s: ERROR: fclose %s: %s\n", argv0, path, strerror(errno));
 			return EE_READ;
 		} else {
 			/* probably not elf */
@@ -320,8 +315,7 @@ read_elf(const char *path) {
 		break;
 	default:
 		/* CANTHAPPEN? */
-		fprintf(stderr, "%s: ERROR: Unknown ELF class %s: ", argv0, path);
-		perror(NULL);
+		fprintf(stderr, "%s: ERROR: Unknown ELF class %s\n", argv0, path);
 		return EE_NONELF;
 	}
 

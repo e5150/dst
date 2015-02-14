@@ -33,6 +33,7 @@
 #include <pwd.h>
 #include <grp.h>
 #include <errno.h>
+#include <string.h>
 
 #include "arg.h"
 
@@ -67,8 +68,7 @@ parse_mode(const char *s) {
 		exit(1);
 	}
 	else if(errno != 0) {
-		fprintf(stderr, "%s: ERROR: strtol %s: ", argv0, s);
-		perror(NULL);
+		fprintf(stderr, "%s: ERROR: strtol %s: %s\n", argv0, s, strerror(errno));
 		exit(1);
 	}
 
@@ -98,8 +98,7 @@ mcn(const char *path) {
 	char fullpath[PATH_MAX];
 
 	if(lstat(path, &fs) == -1) {
-		fprintf(stderr, "%s: ERROR: lstat %s: ", argv0, path);
-		perror(NULL);
+		fprintf(stderr, "%s: ERROR: lstat %s: %s\n", argv0, path, strerror(errno));
 		return 1;
 	}
 
@@ -110,8 +109,7 @@ mcn(const char *path) {
 		if(!dry_run) {
 			err = chown(path, uid, gid);
 			if(err) {
-				fprintf(stderr, "%s: chown %s %d %d: ", argv0, path, uid, gid);
-				perror(NULL);
+				fprintf(stderr, "%s: chown %s %d %d: %s\n", argv0, path, uid, gid, strerror(errno));
 			}
 		}
 	}
@@ -124,8 +122,7 @@ mcn(const char *path) {
 			if(!dry_run) {
 				err = chmod(path, dir_mode);
 				if(err) {
-					fprintf(stderr, "%s: chmod %s %o: ", argv0, path, dir_mode);
-					perror(NULL);
+					fprintf(stderr, "%s: chmod %s %o: %s\n", argv0, path, dir_mode, strerror(errno));
 				}
 			}
 		}
@@ -146,8 +143,7 @@ mcn(const char *path) {
 			if(!dry_run) {
 				err = chmod(path, new_mode);
 				if(err) {
-					fprintf(stderr, "%s: chmod %s %o: ", argv0, path, new_mode);
-					perror(NULL);
+					fprintf(stderr, "%s: chmod %s %o: %s\n", argv0, path, new_mode, strerror(errno));
 				}
 			}
 		}
@@ -156,8 +152,7 @@ mcn(const char *path) {
 	/* recurse */
 	if(S_ISDIR(fs.st_mode)) {
 		if((dp = opendir(path)) == NULL) {
-			fprintf(stderr, "%s: ERROR: opendir %s:", argv0, path);
-			perror(NULL);
+			fprintf(stderr, "%s: ERROR: opendir %s: %s\n", argv0, path, strerror(errno));
 			return 1;
 		}
 		while((c = readdir(dp))) {
@@ -168,8 +163,7 @@ mcn(const char *path) {
 				return 0;
 		}
 		if(closedir(dp) == -1) {
-			fprintf(stderr, "%s: ERROR: closedir %s:", argv0, path);
-			perror(NULL);
+			fprintf(stderr, "%s: ERROR: closedir %s: %s\n", argv0, path, strerror(errno));
 			return 1;
 		}
 	}
@@ -186,8 +180,7 @@ parse_uidstr(const char *str) {
 	user = str;
 	pw = getpwnam(user);
 	if(errno) {
-		fprintf(stderr, "%s: ERROR: getpwnam %s: ", argv0, user);
-		perror(NULL);
+		fprintf(stderr, "%s: ERROR: getpwnam %s: %s\n", argv0, user, strerror(errno));
 		exit(2);
 	} else if(!pw) {
 		fprintf(stderr, "%s: ERROR: No such user: %s\n", argv0, user);
@@ -205,8 +198,7 @@ parse_gidstr(const char *str) {
 	group = str;
 	gr = getgrnam(group);
 	if(errno) {
-		fprintf(stderr, "%s: ERROR: getgrnam %s: ", argv0, group);
-		perror(NULL);
+		fprintf(stderr, "%s: ERROR: getgrnam %s: %s\n", argv0, group, strerror(errno));
 		exit(2);
 	} else if(!gr) {
 		fprintf(stderr, "%s: ERROR: No such group: %s\n", argv0, group);

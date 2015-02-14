@@ -20,7 +20,6 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#define _XOPEN_SOURCE 600
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
@@ -60,8 +59,7 @@ read_file(const char *path) {
 	struct stat fs;
 
 	if(!(fp = fopen(path, "r"))) {
-		fprintf(stderr, "%s: ERROR: unable to open %s: ", argv0, path);
-		perror(NULL);
+		fprintf(stderr, "%s: ERROR: fopen %s: %s\n", argv0, path, strerror(errno));
 		return 1;
 	}
 
@@ -124,8 +122,7 @@ read_file(const char *path) {
 			if(!stat(buf, &fs)) {
 				size += fs.st_size;
 			} else {
-				fprintf(stderr, "%s: stat %s: ", argv0, buf);
-				perror(NULL);
+				fprintf(stderr, "%s: stat %s: %s\n", argv0, buf, strerror(errno));
 			}
 		}
 	}
