@@ -9,6 +9,10 @@ darkstar-packname - extract package information from filename
 mkslack-desc - creates compliant slack-desc
 elfdeps - querys ELF-files for needed libraries.
 cugfd - change user/group/file/directory ownership and permissions
+darkstar-makedep - build dependency database, used by the following tools; 
+darkstar-deptree - print a tree of package dependencies
+darkstar-missingdeps - prints files with unresolved dependencies
+darkstar-whoneeds - print library dependencies
 
 
 Installation
