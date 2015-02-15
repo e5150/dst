@@ -171,9 +171,9 @@ def mk_pkgtree(ROOTS_LIBS, ELF_NODES):
 			dep_node.add_child(pkg_node)
 			
 
-	for root in ROOT_LIBS:
-		pkgname = FILE_TO_PKG[root.name]
-		ROOTS.append(PKG_TO_NODE[pkgname])
+	for node in NODES:
+		if len(node.parents) == 0:
+			ROOTS.append(node)
 
 	return (ROOTS, NODES, PKG_TO_NODE)
 
