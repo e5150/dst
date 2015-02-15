@@ -5,6 +5,7 @@
 .Nd Print a tree of dependencies
 .Sh SYNOPSIS
 .Nm
+.Op Fl -down
 .Op Pa package ...
 .Sh DESCRIPTION
 .Nm
@@ -29,7 +30,9 @@ By default trees will be printed with packages that don't depend
 on any other as roots (ought to be glibc). Unless some
 .Pa packages
 are given as arguments, in which case, they will be used as roots,
-and the trees will be printed "upside down", with the proper roots
+and the trees will be printed "upside down" (unless
+.Fl -down
+is used), with the proper roots
 (libc) as leafs.
 
 .Sh AUTHOR

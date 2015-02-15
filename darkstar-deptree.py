@@ -197,6 +197,12 @@ if __name__ == '__main__':
 			root.traverse()
 		exit(0)
 
+	if '--down' in sys.argv:
+		pkg_up = False
+		sys.argv.pop(sys.argv.index('--down'))
+	else:
+		pkg_up = True
+
 	read_pkgs()
 
 	(ROOT_PKGS, PKG_NODES, PKG_TO_NODE) = mk_pkgtree(ROOT_LIBS, ELF_NODES);
@@ -208,6 +214,6 @@ if __name__ == '__main__':
 		for pkg in sys.argv[1:]:
 			try:
 				pkg = pack_basename(pkg)
-				PKG_TO_NODE[pkg].traverse(up = True)
+				PKG_TO_NODE[pkg].traverse(pkg_up)
 			except KeyError:
 				sys.stderr.write("ERROR: %s does not look like a package name\n" % pkg)

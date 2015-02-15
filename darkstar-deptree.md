@@ -33,7 +33,7 @@ DARKSTAR-DEPTREE(1)</td>
 <td>
 darkstar-deptree</td>
 <td>
-&#91;<span class="opt"><i class="file">package ...</i></span>&#93;</td>
+&#91;<span class="opt"><b class="flag">&#45;-down</b></span>&#93; &#91;<span class="opt"><i class="file">package ...</i></span>&#93;</td>
 </tr>
 </tbody>
 </table>
@@ -41,7 +41,7 @@ darkstar-deptree</td>
 <div class="section">
 <h1 id="x4445534352495054494f4e">DESCRIPTION</h1> <b class="name">darkstar-deptree</b> prints a tree of package dependencies. Package <i class="file">A</i> is determined to depend on package <i class="file">B</i> iff <i class="file">A</i> contains an executable file that is dynamically linked agains some library found in <i class="file">B</i>. The files in <i class="file">/var/log/packages</i> are read to find which package a file belongs to. And <a class="link-man">darkstar-makedep(1)</a> is used to the build the dependancy tree.<div style="height: 1.00em;">
 &#160;</div>
-By default trees will be printed with packages that don't depend on any other as roots (ought to be glibc). Unless some <i class="file">packages</i> are given as arguments, in which case, they will be used as roots, and the trees will be printed &quot;upside down&quot;, with the proper roots (libc) as leafs.<div style="height: 1.00em;">
+By default trees will be printed with packages that don't depend on any other as roots (ought to be glibc). Unless some <i class="file">packages</i> are given as arguments, in which case, they will be used as roots, and the trees will be printed &quot;upside down&quot; (unless <b class="flag">&#45;-down</b> is used), with the proper roots (libc) as leafs.<div style="height: 1.00em;">
 &#160;</div>
 </div>
 <div class="section">
