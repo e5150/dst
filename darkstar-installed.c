@@ -1,4 +1,4 @@
-/* Copyright © 2012-2014 Lars Lindqvist
+/* Copyright © 2012-2015 Lars Lindqvist
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,7 @@
 #include <dirent.h>
 #include <errno.h>
 
-#include "dst.h"
+#include "packname.h"
 #include "arg.h"
 
 #define ADM_DIR "/var/log/packages"

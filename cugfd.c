@@ -1,5 +1,4 @@
-/*
- * Copyright © 2012-2013 Lars Lindqvist
+/* Copyright © 2012-2013 Lars Lindqvist
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -20,7 +19,6 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#define _XOPEN_SOURCE 500
 #include <dirent.h>
 #include <stdio.h>
 #include <sys/types.h>
