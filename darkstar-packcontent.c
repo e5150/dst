@@ -27,10 +27,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <limits.h>
 
-#include "arg.h"
-#include "packname.h"
+#include <llt.h>
+#include <arg.h>
 
 void
 usage() {
@@ -56,6 +55,8 @@ read_file(const char *path) {
 	char *pkg_base;
 	off_t size = 0;
 	struct stat fs;
+	ino_t *inodes = NULL;
+	size_t inodes_n;
 
 	if(!(fp = fopen(path, "r"))) {
 		fprintf(stderr, "%s: ERROR: fopen %s: %s\n", argv0, path, strerror(errno));
@@ -63,6 +64,11 @@ read_file(const char *path) {
 	}
 
 	buf = calloc(PATH_MAX, sizeof(char));
+
+	if (mode == M_SIZE) {
+		inodes = malloc(sizeof(ino_t));
+		inodes_n = 0;
+	}
 
 	while(fgets(buf, PATH_MAX, fp)) {
 		if(!strcmp(buf, "FILE LIST:\n")) {
@@ -119,6 +125,18 @@ read_file(const char *path) {
 			fprintf(stdout, "%s:%s\n", buf, found ? "present" : "missing"); 
 		} else if(mode == M_SIZE && found) {
 			if(!stat(buf, &fs)) {
+				size_t i;
+
+				for (i = 0; i < inodes_n; ++i) {
+					if (inodes[i] == fs.st_ino)
+						break;
+				}
+				if (i < inodes_n) {
+					continue;
+				}
+				inodes = realloc(inodes, ++inodes_n * sizeof(ino_t));
+				inodes[inodes_n - 1] = fs.st_ino;
+
 				size += fs.st_size;
 			} else {
 				fprintf(stderr, "%s: stat %s: %s\n", argv0, buf, strerror(errno));
@@ -126,17 +144,10 @@ read_file(const char *path) {
 		}
 	}
 	if(mode == M_SIZE) {
-		int i;
-		double x;
-		const char prefix[] = "bkMGTPEZY?";
-
-		for(i = 0, x = size; i < 9 && x > 1000.0; x /= 1000.0, i++);
-		if(x < 10.0)
-			fprintf(stdout, "%.2f%c\t%s\n", x, prefix[i], pkg_base);
-		else if(x < 100.0)
-			fprintf(stdout, "%.1f%c\t%s\n", x, prefix[i], pkg_base);
-		else if(x < 1000.0)
-			fprintf(stdout, "%.0f%c\t%s\n", x, prefix[i], pkg_base);
+		char *s = hr(size);
+		fprintf(stdout, "%s\t%s\n", s, pkg_base);
+		free(s);
+		free(inodes);
 	}
 
 	free(pkg_base);
