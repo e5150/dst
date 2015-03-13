@@ -28,8 +28,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <llt.h>
-#include <arg.h>
+#include "arg.h"
+#include "packname.h"
 
 void
 usage() {
