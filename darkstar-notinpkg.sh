@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright © 2010,2015 Lars Lindqvist
+# Copyright (C) 2010,2015 Lars Lindqvist
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -24,25 +24,17 @@ export LC_ALL=C
 FILES_PKG=`mktemp /tmp/dst-pckcmp-inst-pck.XXXXXX`
 FILES_SYS=`mktemp /tmp/dst-pckcmp-inst-sys.XXXXXX`
 
-# Ignore devs if we have devtmpfs or such
-if findmnt /dev >/dev/null 2>&1;then
-	IGNOREDEV="grep -v ^/dev"
-fi
+filter() {
+	sort /dev/fd/0 $IGNOREDEV \
+	| uniq \
+	| grep -vE '^/(root|etc)/' \
+	| grep -vE '^/boot/(map|boot.[0-9]*)' \
+	| grep -vE '^/var/(db|lib|log|run|cache|tmp|spool)'
+}
 
-darkstar-packcontent -d /var/log/packages/* \
-| sed 's#/$##' \
-| sort \
-| uniq \
-| ${IGNOREDEV:-cat} \
-> $FILES_PKG
+darkstar-packcontent -d /var/log/packages/* | sed -e s,/$,, -e s,/bin/bash4,/bin/bash,  | filter > $FILES_PKG
 
-find / /usr /opt -mindepth 1 -xdev ! -type l \
-| sort \
-| uniq \
-| grep -v '^/root/' \
-| grep -vE '^/var/(log|run|cache|tmp|spool)' \
-> $FILES_SYS
-
+find / /usr -mindepth 1 -xdev ! -type l | filter > $FILES_SYS
 
 case "$0" in
 *darkstar-notonsys*) COMMMODE="-32" ;;
