@@ -23,7 +23,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 
-#include "packname.h"
+#include "util.h"
 
 char *
 dst_packname(const char *path, enum SPKG what) {

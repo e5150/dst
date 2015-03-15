@@ -101,7 +101,7 @@ mcn(const char *path) {
 	}
 
 	/* chown */
-	if(ISSET_UID && uid != fs.st_uid || ISSET_GID && gid != fs.st_gid) {
+	if((ISSET_UID && uid != fs.st_uid) || (ISSET_GID && gid != fs.st_gid)) {
 		if(verbose)
 			fprintf(stdout, "chown %s:%s '%s'\n", user ? user : "", group ? group : "", path);
 		if(!dry_run) {

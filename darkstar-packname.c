@@ -22,7 +22,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "packname.h"
+#include "util.h"
 #include "arg.h"
 
 void

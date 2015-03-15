@@ -1,81 +1,92 @@
+PRG=darkstar-tools
 VERSION=14.1
-CFLAGS=-D_XOPEN_SOURCE=500 -g -ansi -fPIC -O3 -I. -Wall -Wextra -Werror -pedantic -Wno-parentheses
-LDFLAGS=
+CFLAGS=-g -O3 -ansi -Wall -Wextra -Werror -pedantic
+CPPFLAGS=-D_XOPEN_SOURCE=500
+LDFLAGS=-L.
+LIBS=-ldst
 CC=gcc
 CPP=g++
 PREFIX?=/usr/local
 MANDIR?=$(PREFIX)/man
 BINDIR?=$(PREFIX)/bin
+SHELL=/bin/sh
+CC=gcc
+CPP=g++
+INSTALL=install
+INSTALL_PROGRAM=$(INSTALL)
+INSTALL_DATA=$(INSTALL) -m644
 
-LLTSRC = \
+.SUFFIXES:
+.SUFFIXES: .o .c
+.SUFFIXES: .oo .cc
+.SUFFIXES: "" .sh
+.SUFFIXES: "" .py
+.SUFFIXES: "" .tcl
+
+SRC = \
 	darkstar-packname.c \
 	darkstar-packcontent.c \
 	darkstar-installed.c \
-	cugfd.c
+	cugfd.c \
+	elfdeps.cc \
+	darkstar-notinpkg.sh \
+	darkstar-makedep.sh \
+	darkstar-missingdeps.sh \
+	darkstar-whoneeds.sh \
+	mkslack-desc.sh \
+	darkstar-deptree.py
 
-CPPSRC = elfdeps.cc
+LIB = \
+	packname.c \
+	findpkg.c \
+	hr.c \
 
-SHSRC = darkstar-notinpkg.sh \
-        darkstar-makedep.sh \
-        darkstar-missingdeps.sh \
-        darkstar-whoneeds.sh \
-        mkslack-desc.sh \
+HDR=util.h arg.h
 
-PYSRC = darkstar-deptree.py
+PRG=$(shell ls $(SRC) | cut -d. -f1)
+OBJ=$(shell ls $(SRC) | grep '\.c*$$' | sed -e 's/\.c$$/.o/' -e 's/\.cc$$/.oo/' )
+MAN=$(PRG:=.1)
 
-HDR=packname.h arg.h
+all: libdst.a $(OBJ) $(PRG) $(HDR)
 
-ALLBIN=$(LLTSRC:.c=)   $(CPPSRC:.cc=)    $(SHSRC:.sh=)   $(PYSRC:.py=)
-ALLMAN=$(LLTSRC:.c=.1) $(CPPSRC:.cc=.1)  $(SHSRC:.sh=.1) $(PYSRC:.py=.1)
-ALLSRC=$(LLTSRC)       $(CPPSRC)         $(SHSRC)        $(PYSRC)        $(HDR) packname.c
-ALLOBJ=$(LLTSRC:.c=.o) $(CPPSRC:.cc=.oo) packname.o                 
+libdst.a: $(LIB:.c=.o)
+	ar rc $@ $^
 
-all: $(ALLOBJ) $(ALLBIN) $(HDR)
-	@echo $(ALLBIN)
-
-%.o: %.c $(HDR)
-	$(CC)  $(CFLAGS) -c -o $@ $<
-%.oo: %.cc $(HDR)
-	$(CPP) $(CFLAGS) -Wno-long-long -c -o $@ $<
-%: %.o
-	$(CC)  $(LDFLAGS) -o $@ $^
-%: %.oo
-	$(CPP) $(LDFLAGS) -o $@ $^
-%: %.sh
-	install -m 0755 $<  $@
-%: %.py
-	install -m 0755 $<  $@
-
-darkstar-installed: darkstar-installed.o packname.o packname.h
-	$(CC)  $(LDFLAGS) -o $@ $< packname.o
-darkstar-packcontent: darkstar-packcontent.o packname.o packname.h
-	$(CC)  $(LDFLAGS) -o $@ $< packname.o
-darkstar-packname: darkstar-packname.o packname.o packname.h
-	$(CC)  $(LDFLAGS) -o $@ $< packname.o
+.c.o:
+	$(CC)  $(CFLAGS) $(CPPFLAGS) -c -o $@ $< $(INCS)
+.cc.oo:
+	$(CPP) $(CFLAGS) $(CPPFLAGS) -c -o $@ $< $(INCS)
+.o: libdst.a
+	$(CC)  $(LDFLAGS) -o $@ $< $(LIBS)
+.oo: libdst.a
+	$(CPP) $(LDFLAGS) -o $@ $< $(LIBS)
+.py:
+	$(INSTALL_PROGRAM) $<  $@
+.sh:
+	$(INSTALL_PROGRAM) $<  $@
+.tcl:
+	$(INSTALL_PROGRAM) $<  $@
 
 install: all
-	mkdir -p $(DESTDIR)/$(BINDIR) \
-	         $(DESTDIR)/$(MANDIR)/man1
-	install -m 0755 -t $(DESTDIR)/$(BINDIR) $(ALLBIN)
-	install -m 0644 -t $(DESTDIR)/$(MANDIR)/man1 $(ALLMAN)
-	( cd $(DESTDIR)/$(BINDIR) ; \
+	mkdir -p $(DESTDIR)$(BINDIR)
+	         $(DESTDIR)$(MANDIR)/man1
+	$(INSTALL_PROGRAM) $(PRG) $(DESTDIR)$(BINDIR)
+	$(INSTALL_DATA) $(MAN) $(DESTDIR)$(MANDIR)
+	( cd $(DESTDIR)$(BINDIR) ; \
 	    ln -sf darkstar-notinpkg darkstar-notonsys ; \
 	)
 
 clean:
-	rm -f $(ALLOBJ) $(ALLBIN) packname.o darkstar-tools-$(VERSION).tar.gz
+	rm -f $(OBJ) $(PRG) $(LIB:.c=.o) libdst.a
 
+dist-clean: clean
+	rm -f $(PRG)-$(VERSION).tar.gz
+	
 dist:
-	mkdir -p darkstar-tools-$(VERSION)
-	tar cf - $(ALLSRC) Makefile | tar -xf - -C darkstar-tools-$(VERSION)/
-	tar czf darkstar-tools-$(VERSION).tar.gz darkstar-tools-$(VERSION)
-	rm -rf darkstar-tools-$(VERSION)
+	mkdir $(PRG)-$(VERSION)
+	cp $(SRC) $(LIB) $(HDR) Makefile $(PRG)-$(VERSION)
+	tar czf $(PRG)-$(VERSION).tar.gz $(PRG)-$(VERSION)
+	rm -r $(PKG)-$(VERSION)
 
-pkg: all
-	rm -fr /tmp/package-dst
-	mkdir -p /tmp/package-dst/install
-	make install PREFIX=/usr DESTDIR=/tmp/package-dst
-	strip --strip-unneeded /tmp/package-dst/usr/bin/* 2>/dev/null || true
-	gzip /tmp/package-dst/usr/man/man1/*
-	/tmp/package-dst/usr/bin/mkslack-desc darkstar-tools "small collection of slackware related programs" < desc > /tmp/package-dst/install/slack-desc
-	cd /tmp/package-dst ; makepkg -l y -c y /tmp/darkstar-tools-$(VERSION)-$(shell uname -m)-1.tgz
+.PHONY:
+	all install clean dist dist-clean

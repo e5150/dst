@@ -1,4 +1,4 @@
-/* Copyright © 2012-2014 Lars Lindqvist
+/* Copyright © 2010,2013 Lars Lindqvist 
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -12,57 +12,36 @@
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
  * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include <string.h>
+#include <sys/types.h>
+#include <stdlib.h>
 #include <stdio.h>
-#include <unistd.h>
-#include <dirent.h>
-#include <errno.h>
 
-#include "arg.h"
-#include "util.h"
+char *
+hr(off_t val) {
+    char *ret;
+    int i;
+    double x;
+    const char prefix[10] = "bkMGTPEZY";
 
-#define ADM_DIR "/var/log/packages"
+    for(i = 0, x = val; x > 1000.0; x /= 1000.0, i++);
 
-void
-usage() {
-	fprintf(stderr, "usage: %s <package [...]>\n", argv0);
-	exit(1);
-}
+    if(i > 9)
+        return NULL;
 
-int
-main(int argc, char *argv[]) {
-	int i, ret;
-	char **files;
+    ret = calloc(6, sizeof(char));
+    if(x < 10.0)
+        sprintf(ret, "%.2f%c", x, prefix[i]);
+    else if(x < 100.0)
+        sprintf(ret, "%.1f%c", x, prefix[i]);
+    else if(x < 1000.0)
+        sprintf(ret, "%.0f%c", x, prefix[i]);
 
-	ARGBEGIN {
-	default:
-		usage();
-	} ARGEND;
-
-	if(!argc)
-		usage();
-
-	files = dst_findpkg(argc, argv);
-
-	ret = 0;
-
-	for(i = 0; i < argc; ++i) {
-		if (files[i] == NULL) {
-			fprintf(stderr, "%s:missing\n", argv[i]);
-			ret = 1;
-		} else {
-			fprintf(stdout, "%s:%s\n", argv[i], files[i]);
-			free(files[i]);
-		}
-	}
-	free(files);
-
-	return ret;
+    return ret;
 }

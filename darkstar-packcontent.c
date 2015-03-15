@@ -25,11 +25,12 @@
 #include <unistd.h>
 #include <errno.h>
 #include <stdio.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "arg.h"
-#include "packname.h"
+#include "util.h"
 
 void
 usage() {
@@ -49,7 +50,7 @@ enum { M_SIZE,
 } mode = M_FL_PRINT;
 
 int
-read_file(const char *path) {
+read_file(const char *pkgfile) {
 	FILE *fp;
 	char *buf;
 	char *pkg_base;
@@ -58,8 +59,8 @@ read_file(const char *path) {
 	ino_t *inodes = NULL;
 	size_t inodes_n;
 
-	if(!(fp = fopen(path, "r"))) {
-		fprintf(stderr, "%s: ERROR: fopen %s: %s\n", argv0, path, strerror(errno));
+	if(!(fp = fopen(pkgfile, "r"))) {
+		fprintf(stderr, "%s: ERROR: fopen %s: %s\n", argv0, pkgfile, strerror(errno));
 		return 1;
 	}
 
@@ -77,16 +78,18 @@ read_file(const char *path) {
 	}
 
 	if(fgets(buf, PATH_MAX, fp) && strcmp(buf, "./\n")) {
-		fprintf(stderr, "%s: %s does not look like a package file\n", argv0, path);
+		fprintf(stderr, "%s: %s does not look like a package file\n", argv0, pkgfile);
 		goto end;
 	}
 
-	pkg_base = dst_packname(path, SPKG_BASE);
+	pkg_base = dst_packname(pkgfile, SPKG_BASE);
 
 	buf[0] = '/';
 	
 	while(fgets(buf + 1, PATH_MAX - 1, fp)) {
 		char *c;
+		char *rp = NULL;
+		char *path;
 		int found;
 
 		if(strstr(buf, "/install") == buf)
@@ -110,21 +113,27 @@ read_file(const char *path) {
 			memmove(c, c + len, strlen(c + len) + 1);
 		}
 
-		if(mode != M_FL_PRINT)
-			found = !access(buf, F_OK);
+		found = !access(buf, F_OK);
+
+		if (found && !(rp = realpath(buf, NULL))) {
+			fprintf(stderr, "%s: ERROR: realpath %s: %s\n", argv0, buf, strerror(errno));
+			continue;
+		}
+
+		path = rp ? rp : buf;
 
 		if(mode == M_FL_PRINT
 		||(mode == M_FL_EXISTS && found)
 		||(mode == M_FL_MISSING && !found)) {
 			if(verbose)
 				fprintf(stdout, "%s:", pkg_base);
-			fprintf(stdout, "%s\n", buf);
+			fprintf(stdout, "%s\n", path);
 		} else if(mode == M_FL_CHECK) {
 			if(verbose)
 				fprintf(stdout, "%s:", pkg_base);
-			fprintf(stdout, "%s:%s\n", buf, found ? "present" : "missing"); 
+			fprintf(stdout, "%s:%s\n", path, found ? "present" : "missing"); 
 		} else if(mode == M_SIZE && found) {
-			if(!stat(buf, &fs)) {
+			if(!stat(path, &fs)) {
 				size_t i;
 
 				for (i = 0; i < inodes_n; ++i) {
@@ -132,6 +141,8 @@ read_file(const char *path) {
 						break;
 				}
 				if (i < inodes_n) {
+					if (rp)
+						free(rp);
 					continue;
 				}
 				inodes = realloc(inodes, ++inodes_n * sizeof(ino_t));
@@ -139,9 +150,12 @@ read_file(const char *path) {
 
 				size += fs.st_size;
 			} else {
-				fprintf(stderr, "%s: stat %s: %s\n", argv0, buf, strerror(errno));
+				fprintf(stderr, "%s: ERROR: stat %s: %s\n", argv0, path, strerror(errno));
 			}
 		}
+
+		if (rp)
+			free(rp);
 	}
 	if(mode == M_SIZE) {
 		char *s = hr(size);
@@ -161,6 +175,7 @@ end:
 int
 main(int argc, char *argv[]) {
 	int i, ret;
+	char **files;
 
 	ARGBEGIN {
 	case 'e':
@@ -194,13 +209,24 @@ main(int argc, char *argv[]) {
 
 	ret = 0;
 
+	files = dst_findpkg(argc, argv);
+
 	for(i = 0; i < argc; ++i) {
 		int tmp;
 
-		tmp = read_file(argv[i]);
+		if (!files[i]) {
+			fprintf(stderr, "%s: ERROR: %s: No such package\n", argv0, argv[i]);
+			continue;
+		}
+
+		tmp = read_file(files[i]);
 		if(tmp > ret)
 			ret = tmp;
+
+		free(files[i]);
 	}
+	
+	free(files);
 
 	return ret;
 }
