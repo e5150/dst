@@ -1,4 +1,4 @@
-PRG=darkstar-tools
+PROGNAME=darkstar-tools
 VERSION=14.1
 CFLAGS=-g -O3 -ansi -Wall -Wextra -Werror -pedantic
 CPPFLAGS=-D_XOPEN_SOURCE=500
@@ -10,8 +10,6 @@ PREFIX?=/usr/local
 MANDIR?=$(PREFIX)/man
 BINDIR?=$(PREFIX)/bin
 SHELL=/bin/sh
-CC=gcc
-CPP=g++
 INSTALL=install
 INSTALL_PROGRAM=$(INSTALL)
 INSTALL_DATA=$(INSTALL) -m644
@@ -52,19 +50,17 @@ all: libdst.a $(OBJ) $(PRG) $(HDR)
 libdst.a: $(LIB:.c=.o)
 	ar rc $@ $^
 
-.c.o:
+%.o: %.c
 	$(CC)  $(CFLAGS) $(CPPFLAGS) -c -o $@ $< $(INCS)
-.cc.oo:
+%.oo: %.cc
 	$(CPP) $(CFLAGS) $(CPPFLAGS) -c -o $@ $< $(INCS)
-.o: libdst.a
+%: %.o libdst.a
 	$(CC)  $(LDFLAGS) -o $@ $< $(LIBS)
-.oo: libdst.a
+%: %.oo libdst.a
 	$(CPP) $(LDFLAGS) -o $@ $< $(LIBS)
-.py:
+%: %.py
 	$(INSTALL_PROGRAM) $<  $@
-.sh:
-	$(INSTALL_PROGRAM) $<  $@
-.tcl:
+%: %.sh
 	$(INSTALL_PROGRAM) $<  $@
 
 install: all
@@ -80,13 +76,13 @@ clean:
 	rm -f $(OBJ) $(PRG) $(LIB:.c=.o) libdst.a
 
 dist-clean: clean
-	rm -f $(PRG)-$(VERSION).tar.gz
+	rm -f $(PROGNAME)-$(VERSION).tar.gz
 	
-dist:
-	mkdir $(PRG)-$(VERSION)
-	cp $(SRC) $(LIB) $(HDR) Makefile $(PRG)-$(VERSION)
-	tar czf $(PRG)-$(VERSION).tar.gz $(PRG)-$(VERSION)
-	rm -r $(PKG)-$(VERSION)
+dist: $(SRC) $(LIB) $(HDR) Makefile
+	mkdir $(PROGNAME)-$(VERSION)
+	cp $(SRC) $(LIB) $(HDR) Makefile elfio-3.0.tar.xz $(PROGNAME)-$(VERSION)
+	tar czf $(PROGNAME)-$(VERSION).tar.gz $(PROGNAME)-$(VERSION)
+	rm -r $(PROGNAME)-$(VERSION)
 
 .PHONY:
 	all install clean dist dist-clean
