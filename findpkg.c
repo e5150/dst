@@ -33,6 +33,7 @@
 struct Pkg {
 	char *file;
 	char *name;
+	char *base;
 	struct Pkg *next;
 };
 struct Pkg *head = NULL;
@@ -54,6 +55,7 @@ populate() {
 		pkg = malloc(sizeof(struct Pkg));
 
 		pkg->name = dst_packname(dc->d_name, SPKG_NAME);
+		pkg->base = dst_packname(dc->d_name, SPKG_BASE);
 
 		len = strlen(ADM_DIR) + 1 + strlen(dc->d_name) + 1;
 		pkg->file = malloc(len * sizeof(char));
@@ -78,12 +80,13 @@ find_pkg(char *name) {
 
 	for(pkg = head; pkg; pkg = pkg->next) {
 		if(!strncmp(name, pkg->file, len)
-		|| !strncmp(name, pkg->name, len)) {
+		|| !strncmp(name, pkg->name, len)
+		|| !strncmp(name, pkg->base, len)) {
 			return pkg;
 		}
 	}
 
-	return 0;
+	return NULL;
 }
 
 static void
@@ -93,6 +96,7 @@ cleanup() {
 	while(head) {
 		pkg = head->next;
 		free(head->name);
+		free(head->base);
 		free(head->file);
 		free(head);
 
@@ -114,16 +118,14 @@ dst_findpkg(size_t argc, char **argv) {
 	for (i = 0; i < argc; ++i) {
 		ret[i] = NULL;
 
-		if (!(name = dst_packname(argv[i], SPKG_NAME))) {
+		if ((name = dst_packname(argv[i], SPKG_BASE))) {
+			if ((pkg = find_pkg(name))) {
+				ret[i] = strdup(pkg->file);
+			}
+			free(name);
+		} else {
 			fprintf(stderr, "findpkg: ERROR: Unable to parse %s\n", argv[i]);
-			continue;
 		}
-
-		if ((pkg = find_pkg(name))) {
-			ret[i] = strdup(pkg->file);
-		}
-
-		free(name);
 	}
 
 	cleanup();
