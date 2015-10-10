@@ -38,6 +38,7 @@
 int dry_run = 0;
 int verbose = 1;
 int keep_exec = 1;
+int follow_symlinks = 0;
 
 mode_t dir_mode = (mode_t)-1;
 mode_t reg_mode = (mode_t)-1;
@@ -100,6 +101,12 @@ mcn(const char *path) {
 		return 1;
 	}
 
+	if(!follow_symlinks && S_ISLNK(fs.st_mode)) {
+		if(verbose)
+			fprintf(stdout, "%s: ignoring symlink: %s\n", argv0, path);
+		return 0;
+	}
+
 	/* chown */
 	if((ISSET_UID && uid != fs.st_uid) || (ISSET_GID && gid != fs.st_gid)) {
 		if(verbose)
@@ -157,8 +164,8 @@ mcn(const char *path) {
 			if(!strcmp(c->d_name, ".") || !strcmp(c->d_name, ".."))
 				continue;
 			snprintf(fullpath, PATH_MAX, "%s/%s", path, c->d_name);
-			if(!mcn(fullpath))
-				return 0;
+			if(mcn(fullpath))
+				err = 1;
 		}
 		if(closedir(dp) == -1) {
 			fprintf(stderr, "%s: ERROR: closedir %s: %s\n", argv0, path, strerror(errno));
@@ -166,7 +173,7 @@ mcn(const char *path) {
 		}
 	}
 	
-	return 1;
+	return err;
 }
 
 
@@ -208,13 +215,13 @@ parse_gidstr(const char *str) {
 
 void
 usage() {
-	fprintf(stderr, "usage: %s [-KDq] [-u <user>] [-g <group>] [-f <mode>] [-d <mode>] <path [...]>\n", argv0);
+	fprintf(stderr, "usage: %s [-KDql] [-u <user>] [-g <group>] [-f <mode>] [-d <mode>] <path [...]>\n", argv0);
 	exit(1);
 }
 
 int
 main(int argc, char *argv[]) {
-	int i = 0;
+	int i = 0, err = 0;
 
 	ARGBEGIN {
 	case 'K':
@@ -237,6 +244,9 @@ main(int argc, char *argv[]) {
 		break;
 	case 'g':
 		parse_gidstr(EARGF(usage()));
+		break;
+	case 'l':
+		follow_symlinks = 1;
 		break;
 	/* undocumented */
 	case 'v':
@@ -266,8 +276,8 @@ main(int argc, char *argv[]) {
 	for(i = 0; i < argc; i++) {
 		if(verbose > 1)
 			printf("path:\t%s\n", argv[i]);
-		else
-			mcn(argv[i]);
+		else if(mcn(argv[i]))
+			err = 1;
 	}
-	return 0;
+	return err;
 }

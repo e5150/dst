@@ -5,7 +5,7 @@
 .Nd change user/group/file/directory ownership and permissions
 .Sh SYNOPSIS
 .Nm
-.Op Fl KDq
+.Op Fl KDql
 .Op Fl u Ar user
 .Op Fl g Ar group
 .Op Fl f Ar file-mode
@@ -39,6 +39,8 @@ Change mode of regular files to the octal
 .It Fl d Ar dir-mode
 Change mode of directories to the octal 
 .Ar dir-mode .
+.It Fl l
+Follow symbolic links.
 .It Fl K
 Don't keep executable bit on regular files.
 .It Fl D
