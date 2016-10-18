@@ -1,0 +1,25 @@
+.Dd 16th of October 2016
+.Dt DARKSTAR-PACKSIZE 1 darkstar-tools-14.2
+.Sh NAME
+.Nm darkstar-packsize
+.Nd prints installed size of package(s)
+.Sh SYNOPSIS
+.Nm
+.Op Fl v
+.Op Fl S | Fl t | Fl l
+.Op pkgname ...
+.Sh DESCRIPTION
+.Nm
+prints the size of package content in human readable form. It might
+differ from the UNCOMPRESSED PACKAGE SIZE reported in the package
+database, if files from a package has been removed. If no arguments
+are given the size of all installed packages will be listed, in
+ascending order of the package size.
+.Sh OPTIONS
+.Bl -tag -width Ds
+.It Fl S
+Do not sort output.
+.It Fl t
+Sort by ascending installation time
+.It Fl l
+Print the last few packages, by installation time

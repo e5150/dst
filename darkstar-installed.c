@@ -1,4 +1,5 @@
-/* Copyright © 2012-2014 Lars Lindqvist
+/*
+ * Copyright © 2012-2014 Lars Lindqvist
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -19,50 +20,51 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include <string.h>
+#include <stdlib.h>
 #include <stdio.h>
-#include <unistd.h>
-#include <dirent.h>
-#include <errno.h>
+
+#include "util/admdir.h"
+#include "util/slist.h"
+#include "util/ealloc.h"
 
 #include "arg.h"
-#include "util.h"
 
-#define ADM_DIR "/var/log/packages"
-
-void
-usage() {
-	fprintf(stderr, "usage: %s <package [...]>\n", argv0);
+static void
+usage(const char *help) {
+	fprintf(stderr, "usage: %s %s\n", argv0, help);
 	exit(1);
 }
 
 int
-main(int argc, char *argv[]) {
-	int i, ret;
-	char **files;
+main(int argc, char **argv) {
+	struct slist_t *list = NULL;
+	const char help[] = "<pkg> ...";
+	int err = 0;
+	int i;
 
 	ARGBEGIN {
 	default:
-		usage();
+		usage(help);
 	} ARGEND;
 
-	if(!argc)
-		usage();
+	if (!argc)
+		usage(help);
 
-	files = dst_findpkg(argc, argv);
+	list = ecalloc(1, sizeof(struct slist_t));
+	err |= read_adm_dir("/var/log/packages", list, NULL, argc, argv);
+	sort_slist(list);
 
-	ret = 0;
-
-	for(i = 0; i < argc; ++i) {
-		if (files[i] == NULL) {
-			fprintf(stderr, "%s:missing\n", argv[i]);
-			ret = 1;
-		} else {
-			fprintf(stdout, "%s:%s\n", argv[i], files[i]);
-			free(files[i]);
+	for (i = 0; i < argc; ++i) {
+		struct slist_item_t *match;
+		match = bsearch_slist_aux(argv[i], list);
+		if (!match) {
+			puts(argv[i]);
+			err |= 1;
 		}
 	}
-	free(files);
 
-	return ret;
+	cleanup_slist(list);
+	free(list);
+
+	return err;
 }

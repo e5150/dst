@@ -1,12 +1,14 @@
-.Dd February 7, 2015
-.Dt ELFDEPS 1 darkstar-tools-14.1
+.Dd 19th of October 2016
+.Dt ELFDEPS 1 darkstar-tools-14.2
 .Sh NAME
 .Nm elfdeps
 .Nd querys ELF files for NEEDED libraries.
 .Sh SYNOPSIS
 .Nm elfdeps
-.Op Fl vvvv
-.Pa file ...
+.Op Fl v | q
+.Op Fl m
+.Op Fl r
+.Pa file ... | -p pkg ...
 .Sh DESCRIPTION
 .Nm
 scans the dynamic section of an ELF file for DT_NEEDED libraries,
@@ -14,14 +16,28 @@ and does a query for the required libraries in the /lib, /usr/lib,
 /usr/local/lib and /lib64, /usr/lib64, /usr/local/lib64 directories
 for 32 and 64 bit ELF files, respectively. Any DT_RPATH found in the
 dynamic section is also scanned for the libraries.
-Output is formatted as "<file>:<lib>:<path>", where 
+Output is formatted as "(<pkg>:)<file>:<lib>:<path>(:<pkg>)", where 
 .Pa file
 is the path given as argument, lib is the needed library and path
 is either the path to required library or "missing".
 .Sh ARGUMENTS
 .Bl -tag -width Ds
-.Fl v
+.Fl q
+Quiet mode, only print DT_NEEDED and DT_RPATHS of
+.Pa file .
+
+.Fl r
+Recursively traverse and directories given on command line.
 Increase verbosity, may be given multiple times, only for debugging.
+
+.Fl d
+Print the package (if any) containing the needed library. 
+
+.Fl p 
+.Pa pkg ...
+Search files owned by the given package(s). Basically:
+.Bd -literal -offset indent
+$ cat /var/log/packages/pkgname | xargs elfdeps
 .Sh CAVEATS
 .Nm
 does not actually resolve library dependencies, it ignores
@@ -41,36 +57,9 @@ non-shared-library file possible. The fact that
 claims that a library is either missing or found at some particular
 path does not answer wheter or not a library dependency is actually
 satisfied, but hopefully it should give an accrurate picture in most cases.
-.Sh EXAMPLE
-Find files with unsatified dependencies (with aforementioned caveats)
-.Bd -literal -offset indent
-$ find / -xdev -type f -perm -100 -exec elfdeps {} + 2>/dev/null | grep :missing$
 .Sh BUGS
 DT_RPATH is (allegedly) deprecated, DT_RUNPATH should be queried as well,
 but isn't.
-.Sh AUTHOR
-Written by Lars Lindqvist.
-.Sh COPYRIGHT
-Copyright (C) 2013-2014 Lars Lindqvist
-.Sh LICENSE
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-.Sh WARRANTY
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
 
 .Sh SEE ALSE
 .Xr ldd 1 ,

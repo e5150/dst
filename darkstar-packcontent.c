@@ -1,4 +1,5 @@
-/* Copyright © 2012-2015 Lars Lindqvist
+/*
+ * Copyright © 2012-2014 Lars Lindqvist
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -21,212 +22,99 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <errno.h>
 #include <unistd.h>
+#include <dirent.h>
+#include <string.h>
 #include <errno.h>
-#include <stdio.h>
 #include <limits.h>
 #include <stdlib.h>
+#include <stdbool.h>
+#include <regex.h>
 #include <string.h>
+#include <stdio.h>
+
+#include "util/admdir.h"
+#include "util/slist.h"
+#include "util/ealloc.h"
 
 #include "arg.h"
-#include "util.h"
 
-void
+static void
 usage() {
-	fprintf(stderr, "usage: %s -s </var/log/package/file [...]>\n", argv0);
-	fprintf(stderr, "usage: %s [-v] [-d] [-p|-c|-e|-m] </var/log/package/file [...]>\n", argv0);
+	fprintf(stderr, "usage: %s [-v] [-e|-m] [pkg ...]\n", argv0);
+	fprintf(stderr, "usage: %s -f file\n", argv0);
 	exit(1);
 }
 
-static int ignore_dirs = 1;
-static int verbose = 0;
-
-enum { M_SIZE,
-       M_FL_PRINT,
-       M_FL_EXISTS,
-       M_FL_MISSING,
-       M_FL_CHECK
-} mode = M_FL_PRINT;
-
 int
-read_file(const char *pkgfile) {
-	FILE *fp;
-	char *buf;
-	char *pkg_base;
-	off_t size = 0;
-	struct stat fs;
-	ino_t *inodes = NULL;
-	size_t inodes_n;
-
-	if(!(fp = fopen(pkgfile, "r"))) {
-		fprintf(stderr, "%s: ERROR: fopen %s: %s\n", argv0, pkgfile, strerror(errno));
-		return 1;
-	}
-
-	buf = calloc(PATH_MAX, sizeof(char));
-
-	if (mode == M_SIZE) {
-		inodes = malloc(sizeof(ino_t));
-		inodes_n = 0;
-	}
-
-	while(fgets(buf, PATH_MAX, fp)) {
-		if(!strcmp(buf, "FILE LIST:\n")) {
-			break;
-		}
-	}
-
-	if(fgets(buf, PATH_MAX, fp) && strcmp(buf, "./\n")) {
-		fprintf(stderr, "%s: %s does not look like a package file\n", argv0, pkgfile);
-		goto end;
-	}
-
-	pkg_base = dst_packname(pkgfile, SPKG_BASE);
-
-	buf[0] = '/';
-	
-	while(fgets(buf + 1, PATH_MAX - 1, fp)) {
-		char *c;
-		char *rp = NULL;
-		char *path;
-		int found;
-
-		if(strstr(buf, "/install") == buf)
-			continue;
-
-		if((c = strstr(buf, ".new\n")) || (c = strrchr(buf, '\n'))) {
-			*c = '\0';
-		} else {
-			fprintf(stderr, "%s: CANTHAPPEN\n", argv0);
-			exit(1);
-		}
-
-		if(ignore_dirs && buf[strlen(buf) - 1] == '/') {
-			continue;
-		}
-
-		if((c = strstr(buf, "/lib64/incoming/")) == buf
-		|| (c = strstr(buf, "/lib/incoming/")) == buf) {
-			size_t len = strlen("/incoming");
-			c = strstr(buf, "/incoming/");
-			memmove(c, c + len, strlen(c + len) + 1);
-		}
-
-		found = !access(buf, F_OK);
-
-		if (found && !(rp = realpath(buf, NULL))) {
-			fprintf(stderr, "%s: ERROR: realpath %s: %s\n", argv0, buf, strerror(errno));
-			continue;
-		}
-
-		path = rp ? rp : buf;
-
-		if(mode == M_FL_PRINT
-		||(mode == M_FL_EXISTS && found)
-		||(mode == M_FL_MISSING && !found)) {
-			if(verbose)
-				fprintf(stdout, "%s:", pkg_base);
-			fprintf(stdout, "%s\n", path);
-		} else if(mode == M_FL_CHECK) {
-			if(verbose)
-				fprintf(stdout, "%s:", pkg_base);
-			fprintf(stdout, "%s:%s\n", path, found ? "present" : "missing"); 
-		} else if(mode == M_SIZE && found) {
-			if(!stat(path, &fs)) {
-				size_t i;
-
-				for (i = 0; i < inodes_n; ++i) {
-					if (inodes[i] == fs.st_ino)
-						break;
-				}
-				if (i < inodes_n) {
-					if (rp)
-						free(rp);
-					continue;
-				}
-				inodes = realloc(inodes, ++inodes_n * sizeof(ino_t));
-				inodes[inodes_n - 1] = fs.st_ino;
-
-				size += fs.st_size;
-			} else {
-				fprintf(stderr, "%s: ERROR: stat %s: %s\n", argv0, path, strerror(errno));
-			}
-		}
-
-		if (rp)
-			free(rp);
-	}
-	if(mode == M_SIZE) {
-		char *s = hr(size);
-		fprintf(stdout, "%s\t%s\n", s, pkg_base);
-		free(s);
-		free(inodes);
-	}
-
-	free(pkg_base);
-end:
-	free(buf);
-	fclose(fp);
-	return 0;
-}
-
-
-int
-main(int argc, char *argv[]) {
-	int i, ret;
-	char **files;
+main(int argc, char **argv) {
+	struct slist_t *list = NULL;
+	const char *regex_str = NULL;
+	regex_t regex;
+	int err = 0;
+	size_t i;
+	bool fflag = false;
+	bool eflag = false;
+	bool mflag = false;
+	bool verbose = false;
 
 	ARGBEGIN {
-	case 'e':
-		mode = M_FL_EXISTS;
-		break;
-	case 'm':
-		mode = M_FL_MISSING;
-		break;
-	case 's':
-		mode = M_SIZE;
-		ignore_dirs = 1;
-		break;
-	case 'd':
-		ignore_dirs = 0;
-		break;
-	case 'p':
-		mode = M_FL_PRINT;
-		break;
-	case 'c':
-		mode = M_FL_CHECK;
+	case 'f':
+		fflag = true;
+		regex_str = EARGF(usage());
 		break;
 	case 'v':
-		++verbose;
+		verbose = true;
+		break;
+	case 'e':
+		eflag = true;
+		break;
+	case 'm':
+		mflag = true;
 		break;
 	default:
 		usage();
 	} ARGEND;
 
-	if(!argc)
+	if (eflag && mflag)
 		usage();
-
-	ret = 0;
-
-	files = dst_findpkg(argc, argv);
-
-	for(i = 0; i < argc; ++i) {
-		int tmp;
-
-		if (!files[i]) {
-			fprintf(stderr, "%s: ERROR: %s: No such package\n", argv0, argv[i]);
-			continue;
+	if (fflag) {
+		verbose = true;
+		if (eflag || mflag || argc)
+			usage();
+		if (regcomp(&regex, regex_str, REG_EXTENDED | REG_NOSUB) != 0) {
+			fprintf(stderr, "%s: ERROR: Invalid regex: %s\n", argv0, regex_str);
+			exit(1);
 		}
-
-		tmp = read_file(files[i]);
-		if(tmp > ret)
-			ret = tmp;
-
-		free(files[i]);
 	}
-	
-	free(files);
 
-	return ret;
+	list = ecalloc(1, sizeof(struct slist_t));
+	err |= read_adm_dir("/var/log/packages", NULL, list, argc, argv);
+
+	for (i = 0; i < list->i; ++i) {
+		const char *file = list->items[i].str;
+		const char *pkg  = list->items[i].aux;
+		bool print = !eflag && !mflag;
+		
+		if (fflag) {
+			print = (regexec(&regex, file, 0, NULL, 0) == 0);
+		} else if (!print) {
+			bool e = access(file, F_OK) == 0;
+			print = eflag && e || mflag && !e;
+		}
+		if (print) {
+			if (verbose) {
+				printf("%s:%s\n", file, pkg);
+			} else {
+				puts(file);
+			}
+		}
+	}
+
+	if (fflag)
+		regfree(&regex);
+	cleanup_slist(list);
+	free(list);
+
+	return err;
 }

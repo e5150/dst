@@ -1,14 +1,12 @@
-.Dd April 16, 2014
-.Dt DARKSTAR-PACKCONTENT 1 darkstar-tools-14.1
+.Dd 16th of April 2014
+.Dt DARKSTAR-PACKCONTENT 1 darkstar-tools-14.2
 .Sh NAME
 .Nm darkstar-packcontent
 .Nd prints content of installed package(s)
 .Sh SYNOPSIS
 .Nm
-.Op Fl vd
-.Op Fl p | Fl c | Fl e | Fl m
-.Pa package-database-file ...
-.Nm darkstar-packcontent -s
+.Op Fl v
+.Op Fl e | Fl m
 .Pa package-database-file ...
 .Sh DESCRIPTION
 .Nm
@@ -20,18 +18,10 @@ the actual installed size of a package.
 .Bl -tag -width Ds
 .It Fl v
 Verbose output, prepend lines with "<package name>:"
-.It Fl d
-Ignore directories.
-.It Fl p
-Only print the file list (default behaviour).
-.It Fl c
-Check for files, appends output with ":present" or ":missing".
 .It Fl e
 Print only existing files.
 .It Fl m
 Print only missing files.
-.It Fl s 
-Print the total size of the files that are present on the system.
 .Sh NOTES
 The /install directory is always ignored, since it should never actually
 stay on the file system when a package has been properly installed.
@@ -41,28 +31,6 @@ will rename such files on a clean system, might cause false results.
 
 To accommodate glibc{,-solibs} lib/incoming/ and lib64/incoming/ are
 truncated to lib/ and lib64/, respectively.
-.Sh AUTHOR
-Written by Lars Lindqvist.
-.Sh COPYRIGHT
-Copyright (C) 2012-2015 Lars Lindqvist
-.Sh LICENSE
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-.Sh WARRANTY
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
 
 .Sh SEE ALSE
 .Xr darkstar-installed 1 ,

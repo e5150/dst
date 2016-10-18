@@ -29,66 +29,63 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <regex.h>
+
 #include <string.h>
 #include <stdio.h>
 
+#include "util/admdir.h"
+#include "util/slist.h"
+#include "util/ealloc.h"
 #include "arg.h"
 
 static void
-usage(const char *help) {
-	fprintf(stderr, "usage: %s %s\n", argv0, help);
+usage() {
+	fprintf(stderr, "usage: %s\n", argv0);
 	exit(1);
 }
 
 int
 main(int argc, char **argv) {
-	const char help[] = "[-v|-b] pkg ...";
+	struct slist_t *list = NULL;
 	int err = 0;
-	int i;
-	bool bflag = false;
-	bool vflag = false;
+	size_t i;
 
 	ARGBEGIN {
-	case 'v':
-		vflag = true;
-		break;
-	case 'b':
-		bflag = true;
-		break;
 	default:
-		usage(help);
+		usage();
 	} ARGEND;
 
-	if (!argc)
-		usage(help);
+	if (argc)
+		usage();
 
-	for (i = 0; i < argc; ++i) {
-		size_t j, sep_n;
-		char *bn = strrchr(argv[i], '/');
-		bn = bn ? bn + 1 : argv[i];
+	list = ecalloc(1, sizeof(struct slist_t));
+	err |= read_adm_dir("/var/log/packages", NULL, list, 0, NULL);
+	sort_slist(list);
 
-		if (bflag) {
-			char *ext;
-			if ((ext = strstr(bn, ".tgz"))
-			 || (ext = strstr(bn, ".txz"))
-			 || (ext = strstr(bn, ".tbz"))
-			 || (ext = strstr(bn, ".tlz"))) {
-				*ext = 0;
+	for (i = 0; i < list->i; ++i) {
+		char *a = list->items[i].str;
+		char *A = list->items[i].aux;
+		size_t j;
+		bool first = true;
+
+		for (j = i + 1; j < list->i; ++j) {
+			char *b = list->items[j].str;
+			char *B = list->items[j].aux;
+
+			if (strcmp(a, b))
+				break;
+			if (first) {
+				printf("%s:%s\n", a, A);
 			}
-		} else {
-			for (sep_n = 0, j = strlen(bn); sep_n < 3 && j > 0; --j) {
-				if (bn[j] == '-') {
-					++sep_n;
-					bn[j] = 0;
-				}
-			}
-			if (vflag) {
-				bn += j + 2;
-			}
+			first = false;
+			printf("%s:%s\n", b, B);
+			i = j;
 		}
-		puts(bn);
 	}
+
+	cleanup_slist(list);
+	free(list);
 
 	return err;
 }
-

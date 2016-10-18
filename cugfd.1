@@ -1,5 +1,5 @@
-.Dd September 9, 2013
-.Dt CUFGF 1 darkstar-tools-14.0
+.Dd 9th of September 2013
+.Dt CUFGF 1 darkstar-tools-14.2
 .Sh NAME
 .Nm cugfd
 .Nd change user/group/file/directory ownership and permissions
@@ -41,35 +41,16 @@ Change mode of directories to the octal
 .Ar dir-mode .
 .It Fl l
 Follow symbolic links.
+.It Fl U
+Only handle unique files (with no hardlinks).
+.It Fl x
+Don't recurse into mountpoints.
 .It Fl K
 Don't keep executable bit on regular files.
 .It Fl D
 Dry run, don't do any changes.
 .It Fl q
 Quiet operation, only print warnings and errors.
-.Sh AUTHOR
-Written by Lars Lindqvist.
-.Sh COPYRIGHT
-Copyright (C) 2012-2013 Lars Lindqvist
-.Sh LICENSE
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-.Sh WARRANTY
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
 
 .Sh SEE ALSE
 .Xr chmod 1 ,
