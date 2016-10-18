@@ -129,15 +129,14 @@ print_missing_from_2nd(const struct slist_t *list_a, const struct slist_t *list_
 }
 
 static void
-usage(const char *help) {
-	fprintf(stderr, "usage: %s %s\n", argv0, help);
+usage() {
+	fprintf(stderr, "usage: %s [-e exclusion-regex]\n", argv0);
 	exit(1);
 }
 
 int
 main(int argc, char **argv) {
 	const char *regex_str = "^/(var/|mnt/|etc/|boot/(map|boot.[0-9]*))";
-	const char help[] = "[-e exclude]";
 	int err = 0;
 	struct slist_t *sys_list;
 	struct slist_t *pkg_list;
@@ -145,14 +144,14 @@ main(int argc, char **argv) {
 
 	ARGBEGIN {
 	case 'e':
-		regex_str = EARGF(usage(help));
+		regex_str = EARGF(usage());
 		break;
 	default:
-		usage(help);
+		usage();
 	} ARGEND;
 
 	if (argc)
-		usage(help);
+		usage();
 
 	if (regcomp(&regex, regex_str, REG_EXTENDED | REG_NOSUB)) {
 		fprintf(stderr, "%s: ERROR: Invalid regex: %s\n", argv0, regex_str);

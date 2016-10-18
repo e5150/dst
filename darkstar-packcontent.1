@@ -1,4 +1,4 @@
-.Dd 16th of April 2014
+.Dd 19th of October 2016
 .Dt DARKSTAR-PACKCONTENT 1 darkstar-tools-14.2
 .Sh NAME
 .Nm darkstar-packcontent
@@ -7,7 +7,9 @@
 .Nm
 .Op Fl v
 .Op Fl e | Fl m
-.Pa package-database-file ...
+.Pa pkg ...
+.Nm
+.Pa -f file-regex
 .Sh DESCRIPTION
 .Nm
 prints information about the files belonging to an installed package.
@@ -22,6 +24,12 @@ Verbose output, prepend lines with "<package name>:"
 Print only existing files.
 .It Fl m
 Print only missing files.
+.It Fl f 
+Print files matching
+.Pa regex
+and the package(s) owning them, for those who are too lazy to:
+.Bd -literal -offset indent
+$ grep regex /var/log/packages/*
 .Sh NOTES
 The /install directory is always ignored, since it should never actually
 stay on the file system when a package has been properly installed.

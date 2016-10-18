@@ -30,25 +30,24 @@
 #include "arg.h"
 
 static void
-usage(const char *help) {
-	fprintf(stderr, "usage: %s %s\n", argv0, help);
+usage() {
+	fprintf(stderr, "usage: %s <pkg> ...\n", argv0);
 	exit(1);
 }
 
 int
 main(int argc, char **argv) {
 	struct slist_t *list = NULL;
-	const char help[] = "<pkg> ...";
 	int err = 0;
 	int i;
 
 	ARGBEGIN {
 	default:
-		usage(help);
+		usage();
 	} ARGEND;
 
 	if (!argc)
-		usage(help);
+		usage();
 
 	list = ecalloc(1, sizeof(struct slist_t));
 	err |= read_adm_dir("/var/log/packages", list, NULL, argc, argv);
