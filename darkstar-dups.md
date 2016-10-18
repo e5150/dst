@@ -1,0 +1,12 @@
+DARKSTAR-DUPS(1)                 General Commands Manual (darkstar-tools-14.2)
+
+NAME
+     darkstar-dups – print a list of files beloging to multiple packages.
+
+SYNOPSIS
+     darkstar-dups prints files that are present on the / filesystem that
+                   doesn't belong to any package.
+
+
+
+                             16th of October 2016
