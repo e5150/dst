@@ -4,8 +4,7 @@ NAME
      darkstar-packcontent – prints content of installed package(s)
 
 SYNOPSIS
-     darkstar-packcontent [-v] [-e | -m] pkg ...
-     darkstar-packcontent -f file-regex
+     darkstar-packcontent [-v] [-e | -m] pkg ... | -f file-regex
 
 DESCRIPTION
      darkstar-packcontent prints information about the files belonging to an

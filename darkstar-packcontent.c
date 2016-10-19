@@ -41,8 +41,7 @@
 
 static void
 usage() {
-	fprintf(stderr, "usage: %s [-v] [-e|-m] [pkg ...]\n", argv0);
-	fprintf(stderr, "usage: %s -f file\n", argv0);
+	fprintf(stderr, "usage: %s [-v] [-e|-m] [-f file | pkg ...]\n", argv0);
 	exit(1);
 }
 
@@ -80,7 +79,7 @@ main(int argc, char **argv) {
 		usage();
 	if (fflag) {
 		verbose = true;
-		if (eflag || mflag || argc)
+		if (argc)
 			usage();
 		if (regcomp(&regex, regex_str, REG_EXTENDED | REG_NOSUB) != 0) {
 			fprintf(stderr, "%s: ERROR: Invalid regex: %s\n", argv0, regex_str);
@@ -96,12 +95,12 @@ main(int argc, char **argv) {
 		const char *pkg  = list->items[i].aux;
 		bool print = !eflag && !mflag;
 		
-		if (fflag) {
-			print = (regexec(&regex, file, 0, NULL, 0) == 0);
-		} else if (!print) {
+		if (!print) {
 			bool e = access(file, F_OK) == 0;
 			print = eflag && e || mflag && !e;
 		}
+		if (fflag && regexec(&regex, file, 0, NULL, 0) == REG_NOMATCH)
+			print = false;
 		if (print) {
 			if (verbose) {
 				printf("%s:%s\n", file, pkg);
