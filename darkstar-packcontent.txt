@@ -10,8 +10,8 @@ SYNOPSIS
 DESCRIPTION
      darkstar-packcontent prints information about the files belonging to an
      installed package.  It reads the the "FILE LIST:" section of a packge,
-     and can find out if a file or directory is still present on the system or
-     not, and compute the actual installed size of a package.
+     and finds out if a file or directory is still present on the system or
+     not.
 
 OPTIONS
      -v      Verbose output, prepend lines with "<package name>:"
