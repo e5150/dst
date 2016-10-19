@@ -15,6 +15,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/*
+ * The part of the code that does the ELF parsing is based on
+ * elfls / elfrw of ELFkickers by Brian Raiter, which can be found
+ * at https://github.com/BR903/ELFkickers
+ */
+
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -63,13 +69,24 @@ struct elffile_t {
 	struct elffile_t *next;
 };
 
-enum { VERB_ELFONLY = 0, VERB_FINDDEP = 1, VERB_FINDPKG = 2 };
+#define PR_ELF_ONLY 0
+#define PR_OWN_PACK (1 << 0)
+#define PR_OWN_PATH (1 << 1)
+#define PR_DTNEEDED (1 << 2)
+#define PR_DEP_PATH (1 << 3)
+#define PR_DEP_PACK (1 << 4)
+static unsigned verbose;
 
 static const char missing_str[] = "missing";
 static bool search_pkgs = false;
+static bool no_circular = false;
 static bool recurse = false;
 static bool only_missing = false;
-static int verbose = VERB_FINDDEP;
+static struct {
+	bool use;
+	regex_t rex;
+	const char *str;
+} who_needs = { false };
 
 static struct elffile_t *head = NULL;
 
@@ -89,8 +106,15 @@ rev_32half(Elf32_Half in) {
 }
 static Elf32_Word
 rev_32word(Elf32_Word in) {
-      __asm__("bswap %0": "=r"(in):"0"(in));
+#if defined __i386__ || defined __x86_64__
+	__asm__("bswap %0" : "=r"(in) : "0"(in));
 	return in;
+#else
+	return ((in & 0x000000FFU) << 24)
+	 | ((in & 0x0000FF00U) << 8)
+	 | ((in & 0x00FF0000U) >> 8)
+	 | ((in & 0xFF000000U) >> 24);
+#endif
 }
 
 static inline void
@@ -104,12 +128,40 @@ revinplc2(void *in) {
 
 static inline void
 revinplc4(void *in) {
-      __asm__("bswap %0": "=r"(*(unsigned int *)in):"0"(*(unsigned int *)in));
+#if defined __i386__ || defined __x86_64__
+	__asm__("bswap %0" : "=r"(*(unsigned int*)in) : "0"(*(unsigned int*)in));
+#else
+	unsigned char tmp;
+
+	tmp = ((unsigned char*)in)[0];
+	((unsigned char*)in)[0] = ((unsigned char*)in)[3];
+	((unsigned char*)in)[3] = tmp;
+	tmp = ((unsigned char*)in)[1];
+	((unsigned char*)in)[1] = ((unsigned char*)in)[2];
+	((unsigned char*)in)[2] = tmp;
+#endif
 }
 
 static inline void
 revinplc8(void *in) {
-      __asm__("bswap %0": "=r"(*(unsigned long *)in):"0"(*(unsigned long *)in));
+#if defined __x86_64__
+	__asm__("bswap %0" : "=r"(*(unsigned long*)in) : "0"(*(unsigned long*)in));
+#else
+	unsigned char tmp;
+
+	tmp = ((unsigned char*)in)[0];
+	((unsigned char*)in)[0] = ((unsigned char*)in)[7];
+	((unsigned char*)in)[7] = tmp;
+	tmp = ((unsigned char*)in)[1];
+	((unsigned char*)in)[1] = ((unsigned char*)in)[6];
+	((unsigned char*)in)[6] = tmp;
+	tmp = ((unsigned char*)in)[2];
+	((unsigned char*)in)[2] = ((unsigned char*)in)[5];
+	((unsigned char*)in)[5] = tmp;
+	tmp = ((unsigned char*)in)[3];
+	((unsigned char*)in)[3] = ((unsigned char*)in)[4];
+	((unsigned char*)in)[4] = tmp;
+#endif
 }
 
 #define revinplc_32half(in)  (revinplc2(in))
@@ -499,21 +551,39 @@ add_rpath(const char *path, struct libdir_t *head) {
 		if (!strcmp(tmp->path, path))
 			return head;
 	}
-	if (tmp = mk_libdir(path, EC_RP)) {
+	if ((tmp = mk_libdir(path, EC_RP))) {
 		tmp->next = head;
 		head = tmp;
 	}
 	return head;
 }
 
+static char *
+add_tok_to_line(char *line, const char *tok) {
+	size_t len = line ? strlen(line) : 0;
+	size_t new = len + 1 + strlen(tok) + 1;
+
+	line = erealloc(line, new);
+	sprintf(line + len, "%s:", tok);
+	return line;
+}
+
+static bool
+who_needed(const char *str) {
+	if (!who_needs.use)
+		return true;
+	return regexec(&who_needs.rex, str, 0, NULL, 0) != REG_NOMATCH;
+}
+
 static int
 handle(struct elffile_t *head, const struct slist_t *fslist) {
+	struct slist_t *lines;
 	struct libdir_t *libdirs = NULL;
 	struct elffile_t *elf;
 	int err = 0;
 	size_t i;
 
-	if (verbose == VERB_ELFONLY) {
+	if (verbose == PR_ELF_ONLY) {
 		for (elf = head; elf; elf = elf->next) {
 			for (i = 0; i < elf->rpaths.i; ++i) {
 				if (search_pkgs)
@@ -531,6 +601,7 @@ handle(struct elffile_t *head, const struct slist_t *fslist) {
 		return 0;
 	}
 
+	lines = ecalloc(1, sizeof(struct slist_t));
 	libdirs = init_sysdirs();
 
 	for (elf = head; elf; elf = elf->next) {
@@ -540,33 +611,65 @@ handle(struct elffile_t *head, const struct slist_t *fslist) {
 		}
 
 		for (i = 0; i < elf->needed.i; ++i) {
+			char *line = NULL;
 			bool match;
 			const char *lib = elf->needed.items[i].str;
 			char dep_lib[PATH_MAX];
 
 			match = find_needed(lib, dep_lib, elf, libdirs); 
 
-			if (match && only_missing) {
+			if (match && only_missing)
 				continue;
+			if (!who_needed(lib))
+				continue;
+
+			if (verbose & PR_OWN_PACK)
+				line = add_tok_to_line(line, elf->pkg);
+			if (verbose & PR_OWN_PATH)
+				line = add_tok_to_line(line, elf->path);
+			if (verbose & PR_DTNEEDED)
+				line = add_tok_to_line(line, lib);
+			if (verbose & PR_DEP_PATH)
+				line = add_tok_to_line(line, dep_lib);
+			if (verbose & PR_DEP_PACK) {
+				const char *pkg = missing_str;
+				if (match) {
+					const struct slist_item_t *dep = bsearch_slist(dep_lib, fslist);
+					if (dep) {
+						pkg = dep->aux;
+						if (no_circular && !strcmp(pkg, elf->pkg)
+						 || !who_needed(pkg)) {
+							free(line);
+							continue;
+						}
+					}
+				}
+				line = add_tok_to_line(line, pkg);
 			}
-
-			if (search_pkgs || verbose == VERB_FINDPKG) {
-				printf("%s:", elf->pkg);
-			}
-
-			printf("%s:%s:%s", elf->path, lib, dep_lib);
-
-			if (verbose == VERB_FINDPKG) {
-				const struct slist_item_t *dep;
-				dep = bsearch_slist(dep_lib, fslist);
-				printf(":%s", dep ? dep->aux : missing_str);
-			}
-			printf("\n");
-
+			add_to_slist(lines, line, NULL, 1000);
 		}
+	}
+	sort_slist(lines);
+	for (i = 0; i < lines->i; ++i) {
+		char *line = lines->items[i].str;
+		size_t len = strlen(line);
+		size_t j;
+		if (!len)
+			continue;
+		for (j = i; j < lines->i; ++j) {
+			if (!strcmp(line, lines->items[j].str)) {
+				++i;
+			} else {
+				break;
+			}
+		}
+		line[len - 1] = '\0';
+		puts(line);
 	}
 
 	cleanup_libdir(libdirs);
+	cleanup_slist(lines);
+	free(lines);
 
 	return err;
 }
@@ -792,8 +895,31 @@ mcnx(const char *path) {
 
 static void
 usage() {
-	fprintf(stderr, "usage: %s [-q|-v] [-m] [-r] <file [...]>\n", argv0);
-	fprintf(stderr, "usage: %s [-q|-v] [-m] -p <pkg [...]>\n", argv0);
+	printf("usage: %s [options] <[-r] file ... | [-c] -p [pkg ...]>\n", argv0);
+	printf("options:\n"
+	       "\t-p search for content of pkg(s) rather than file(s)\n"
+	       "\t-r recursively search directories on command line\n"
+	       "\t-m only print items with unsatisfied dependancies\n"
+	       "\t-c omit circular package dependancies\n"
+	       "\t-w regex, print only items who has a dependancy matching regex\n"
+	);
+	printf("output options (may be combined, latest directive has priority):\n"
+	       "\t-E print nothing but elf DT_RPATH and DT_NEEDED\n"
+	       "\t-o|-O print / omit owning package\n"
+	       "\t-f|-F print / omit file path\n"
+	       "\t-n|-N print / omit needed library\n"
+	       "\t-l|-L print / omit library path\n"
+	       "\t-d|-D print / omit dependant package\n"
+	       "\t-z alias for -pcEod\n"
+	);
+	printf("Defualt output options are: -OfnlD\n");
+	printf("Output format is:\n"
+	       "\t<owning package>:<file path>:<needed>:<lib path>:<lib package>\n"
+	       "\tIf a token should be omitted, the corresponding colon is also omitted.\n"
+	       "\tThus, the default output format is:\n"
+	       "\t<file path>:<needed>:<lib path>\n"
+	);
+	       
 	exit(1);
 }
 
@@ -801,18 +927,14 @@ int
 main(int argc, char *argv[]) {
 	const char *adm_dir = "/var/log/packages";
 	struct slist_t *fslist = NULL;
-	bool search_deps = false;
 	size_t i;
 	int err = 0;
+
+	verbose = PR_OWN_PATH | PR_DTNEEDED | PR_DEP_PATH;
 
 	ARGBEGIN {
 	case 'A':
 		adm_dir = EARGF(usage());
-		break;
-
-	case 'd':
-		verbose = VERB_FINDPKG;
-		search_deps = true;
 		break;
 
 	case 'p':
@@ -824,37 +946,83 @@ main(int argc, char *argv[]) {
 		break;
 
 	case 'x':
-		break;
-
 	case 'r':
 		recurse = true;
 		break;
 
-	case 'v':
-		++verbose;
+	case 'c':
+		no_circular = true;
 		break;
+
+	case 'w':
+		who_needs.use = true;
+		who_needs.str = EARGF(usage());
+		break;
+
+	case 'o':
+		verbose |=  PR_OWN_PACK;
+		break;
+	case 'O':
+		verbose &= ~PR_OWN_PACK;
+		break;
+	case 'f':
+		verbose |=  PR_OWN_PATH;
+		break;
+	case 'F':
+		verbose &= ~PR_OWN_PATH;
+		break;
+	case 'n':
+		verbose |=  PR_DTNEEDED;
+		break;
+	case 'N':
+		verbose &= ~PR_DTNEEDED;
+		break;
+	case 'l':
+		verbose |=  PR_DEP_PATH;
+		break;
+	case 'L':
+		verbose &= ~PR_DEP_PATH;
+		break;
+	case 'd':
+		verbose |=  PR_DEP_PACK;
+		break;
+	case 'D':
+		verbose &= ~PR_DEP_PACK;
+		break;
+
 	case 'q':
-		--verbose;
+	case 'E':
+	case 'e':
+		verbose = PR_ELF_ONLY;
 		break;
+
+	case 'z':
+		search_pkgs = true;
+		no_circular = true;
+		verbose = PR_OWN_PACK | PR_DEP_PACK;
+		break;
+	
+
 	default:
 		usage();
 	}
 	ARGEND;
 
-	if (!argc)
+	if (!argc && !search_pkgs)
 		usage();
 
 	if (search_pkgs && recurse)
 		usage();
-
-	if (verbose < VERB_ELFONLY)
-		usage();
-	else if (verbose == VERB_FINDPKG)
-		search_deps = true;
-	else if (verbose > VERB_FINDPKG)
+	if (!search_pkgs && no_circular)
 		usage();
 
-	if (search_deps) {
+	if (who_needs.use && regcomp(&who_needs.rex, who_needs.str, REG_EXTENDED | REG_NOSUB)) {
+		fprintf(stderr, "%s: ERROR: Invalid regex: %s\n", argv0, who_needs.str);
+		exit(1);
+	}
+
+
+	if (verbose & PR_DEP_PACK) {
 		fslist = (struct slist_t*)ecalloc(1, sizeof(struct slist_t));
 		err |= read_adm_dir(adm_dir, NULL, fslist, 0, NULL);
 
@@ -883,11 +1051,12 @@ main(int argc, char *argv[]) {
 		cleanup_slist(&pkgs);
 	} else {
 		int j;
+
 		for (j = 0; j < argc; ++j) {
 			err |= mcnx(argv[j]);
 		}
 
-		if (search_deps) {
+		if (verbose & (PR_DEP_PACK | PR_OWN_PACK)) {
 			struct elffile_t *tmp;
 
 			for (tmp = head; tmp; tmp = tmp->next) {
@@ -922,6 +1091,9 @@ main(int argc, char *argv[]) {
 		free(fslist);
 	}
 
+	if (who_needs.use) {
+		regfree(&who_needs.rex);
+	}
 
 	return err ? 1 : 0;
 }

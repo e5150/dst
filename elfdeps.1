@@ -5,10 +5,7 @@
 .Nd querys ELF files for NEEDED libraries.
 .Sh SYNOPSIS
 .Nm elfdeps
-.Op Fl v | q
-.Op Fl m
-.Op Fl r
-.Pa file ... | -p pkg ...
+.Pa options < [-r] file ... | [-c] -p [pkg ...]>
 .Sh DESCRIPTION
 .Nm
 scans the dynamic section of an ELF file for DT_NEEDED libraries,
@@ -16,28 +13,75 @@ and does a query for the required libraries in the /lib, /usr/lib,
 /usr/local/lib and /lib64, /usr/lib64, /usr/local/lib64 directories
 for 32 and 64 bit ELF files, respectively. Any DT_RPATH found in the
 dynamic section is also scanned for the libraries.
-Output is formatted as "(<pkg>:)<file>:<lib>:<path>(:<pkg>)", where 
+Output is formatted as
+.Pa (<pkg>:)<file>:<lib>:<path>(:<pkg>) ,
+where 
 .Pa file
-is the path given as argument, lib is the needed library and path
-is either the path to required library or "missing".
+is the path given as argument, 
+.Pa lib 
+is the needed library and 
+.Pa path
+is either the path to required library or 
+.Pa "missing" .
 .Sh ARGUMENTS
 .Bl -tag -width Ds
-.Fl q
-Quiet mode, only print DT_NEEDED and DT_RPATHS of
-.Pa file .
-
 .Fl r
-Recursively traverse and directories given on command line.
-Increase verbosity, may be given multiple times, only for debugging.
+Recursively traverse any directories given on command line.
 
-.Fl d
-Print the package (if any) containing the needed library. 
+.Fl m
+Only print items that depend on libraries that cannot be located.
+
+.Fl w
+.Pa regex
+Only print items depending on a library or package matching
+.Pa regex .
+(Note: Will only match against the library name, not path.)
 
 .Fl p 
-.Pa pkg ...
-Search files owned by the given package(s). Basically:
+.Pa [pkg ...]
+Search files owned by the given package(s). If no packages are given,
+all packages are scanned. Basically:
 .Bd -literal -offset indent
-$ cat /var/log/packages/pkgname | xargs elfdeps
+$ cat /var/log/packages/pkg | xargs elfdeps
+
+.Ed
+.Fl c
+Do not list packages that depend on themself.
+
+.Fl o | O
+Print or omit, respectively, the package owning a queried file.
+
+.Fl f | F
+Print or omit, respectively, the path of a queried file. 
+
+.Fl n | N
+Print or omit, respectively, the name of a needed library.
+
+.Fl l | L
+Print or omit, respectively, the path of a needed library.
+
+.Fl d | D
+Print or omit, respectively, the package containing a needed library.
+
+.Fl E
+Print nothing but the DT_RPATH and DT_NEEDED sections of queried file(s).
+(Can otherwise be used to reset the default print flags.)
+
+.Fl z
+Alias for 
+.Pa -pcEod .
+I.e. print only package dependancies, 
+.Pa <pkg-a>:<pkg-b> ,
+where
+.Pa pkg-a
+!=
+.Pa pkg-b
+and 
+.Pa pkg-a
+contains a file dependant on a file contained in
+.Pa pkg-b .
+
+
 .Sh CAVEATS
 .Nm
 does not actually resolve library dependencies, it ignores
@@ -45,7 +89,7 @@ does not actually resolve library dependencies, it ignores
 to sacrifice accuracy for speed. For proper dependency resolution use
 .Xr ldd 1 .
 The program scans each directory only once, multiple 
-.Pa file s
+.Pa files
 sharing DT_RPATH, or DT_RPATH containing e.g. /usr/lib64, will not
 incur rescanning of the given directory. Files in a scanned directory
 is regarded as a potential library iff its name contains the string

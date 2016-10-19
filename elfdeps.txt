@@ -4,7 +4,7 @@ NAME
      elfdeps – querys ELF files for NEEDED libraries.
 
 SYNOPSIS
-     elfdeps [-v | -q] [-m] [-r] file ... | -p pkg ...
+     elfdeps options < [-r] file ... | [-c] -p [pkg ...]>
 
 DESCRIPTION
      elfdeps scans the dynamic section of an ELF file for DT_NEEDED libraries,
@@ -12,27 +12,50 @@ DESCRIPTION
      /usr/local/lib and /lib64, /usr/lib64, /usr/local/lib64 directories for
      32 and 64 bit ELF files, respectively. Any DT_RPATH found in the dynamic
      section is also scanned for the libraries.  Output is formatted as
-     "(<pkg>:)<file>:<lib>:<path>(:<pkg>)", where file is the path given as
+     (<pkg>:)<file>:<lib>:<path>(:<pkg>), where file is the path given as
      argument, lib is the needed library and path is either the path to
-     required library or "missing".
+     required library or missing.
 
 ARGUMENTS
-     -q Quiet mode, only print DT_NEEDED and DT_RPATHS of file.
+     -r Recursively traverse any directories given on command line.
 
-     -r Recursively traverse and directories given on command line.  Increase
-     verbosity, may be given multiple times, only for debugging.
+     -m Only print items that depend on libraries that cannot be located.
 
-     -d Print the package (if any) containing the needed library.
+     -w regex Only print items depending on a library or package matching
+     regex.  (Note: Will only match against the library name, not path.)
 
-     -p pkg ... Search files owned by the given package(s). Basically:
+     -p [pkg ...] Search files owned by the given package(s). If no packages
+     are given, all packages are scanned. Basically:
 
-           $ cat /var/log/packages/pkgname | xargs elfdeps
+           $ cat /var/log/packages/pkg | xargs elfdeps
+
+     -c Do not list packages that depend on themself.
+
+     -o | -O Print or omit, respectively, the package owning a queried file.
+
+     -f | -F Print or omit, respectively, the path of a queried file.
+
+     -n | -N Print or omit, respectively, the name of a needed library.
+
+     -l | -L Print or omit, respectively, the path of a needed library.
+
+     -d | -D Print or omit, respectively, the package containing a needed
+     library.
+
+     -E Print nothing but the DT_RPATH and DT_NEEDED sections of queried
+     file(s).  (Can otherwise be used to reset the default print flags.)
+
+     -z Alias for -pcEod.  I.e. print only package dependancies,
+     <pkg-a>:<pkg-b>, where pkg-a != pkg-b and pkg-a contains a file dependant
+     on a file contained in pkg-b.
+
+
 
 CAVEATS
      elfdeps does not actually resolve library dependencies, it ignores
      /etc/ld.so.cache, /etc/ld.so.conf and $LD_LIBRARY_PATH. It is designed to
      sacrifice accuracy for speed. For proper dependency resolution use
-     ldd(1).  The program scans each directory only once, multiple file s
+     ldd(1).  The program scans each directory only once, multiple files
      sharing DT_RPATH, or DT_RPATH containing e.g. /usr/lib64, will not incur
      rescanning of the given directory. Files in a scanned directory is
      regarded as a potential library iff its name contains the string ".so",
