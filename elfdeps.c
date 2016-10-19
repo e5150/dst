@@ -21,6 +21,10 @@
  * at https://github.com/BR903/ELFkickers
  */
 
+/*
+ * configure:EXTRAOPTS=-std=c99
+ */
+
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -45,8 +49,10 @@ static struct {
 	enum ec_t ec;
 	const char *path;
 } default_libdirs[] = {
+/*
 	{ EC_64, "/usr/local/lib64" },
 	{ EC_32, "/usr/local/lib" },
+*/
 	{ EC_64, "/lib64" },
 	{ EC_64, "/usr/lib64" },
 	{ EC_32, "/usr/lib" },
@@ -656,7 +662,7 @@ handle(struct elffile_t *head, const struct slist_t *fslist) {
 		size_t j;
 		if (!len)
 			continue;
-		for (j = i; j < lines->i; ++j) {
+		for (j = i + 1; j < lines->i; ++j) {
 			if (!strcmp(line, lines->items[j].str)) {
 				++i;
 			} else {
@@ -911,6 +917,7 @@ usage() {
 	       "\t-l|-L print / omit library path\n"
 	       "\t-d|-D print / omit dependant package\n"
 	       "\t-z alias for -pcEod\n"
+	       "\t-v alias for -pcod\n"
 	);
 	printf("Defualt output options are: -OfnlD\n");
 	printf("Output format is:\n"
@@ -1001,7 +1008,12 @@ main(int argc, char *argv[]) {
 		no_circular = true;
 		verbose = PR_OWN_PACK | PR_DEP_PACK;
 		break;
-	
+	case 'v':
+		search_pkgs = true;
+		no_circular = true;
+		verbose = ~PR_ELF_ONLY;
+		break;
+
 
 	default:
 		usage();
