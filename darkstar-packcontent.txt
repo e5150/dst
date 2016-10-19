@@ -4,7 +4,8 @@ NAME
      darkstar-packcontent – prints content of installed package(s)
 
 SYNOPSIS
-     darkstar-packcontent [-v] [-e | -m] package-database-file ...
+     darkstar-packcontent [-v] [-e | -m] pkg ...
+     darkstar-packcontent -f file-regex
 
 DESCRIPTION
      darkstar-packcontent prints information about the files belonging to an
@@ -18,6 +19,11 @@ OPTIONS
      -e      Print only existing files.
 
      -m      Print only missing files.
+
+     -f      Print files matching regex and the package(s) owning them, for
+             those who are too lazy to:
+
+                   $ grep regex /var/log/packages/*
 
 NOTES
      The /install directory is always ignored, since it should never actually
@@ -33,4 +39,4 @@ NOTES
 SEE ALSE
      darkstar-installed(1),
 
-                              16th of April 2014
+                             19th of October 2016
