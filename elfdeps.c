@@ -219,35 +219,6 @@ elfrw_initialize_ident(unsigned char const *ident) {
 	return 0;
 }
 
-
-static int
-elfrw_read_Dyns(FILE *fp, Elf64_Dyn *in, int count) {
-	int i;
-
-	for (i = 0; i < count; ++i, ++in) {
-		if (is64bit_form()) {
-			if (1 != fread(in, sizeof(Elf64_Dyn), 1, fp))
-				break;
-			if (!native_form()) {
-				revinplc_64xword(&in->d_tag);
-				revinplc_64xword(&in->d_un);
-			}
-		} else {
-			Elf32_Dyn in32;
-			if (1 != fread(&in32, sizeof(Elf32_Dyn), 1, fp))
-				break;
-			if (native_form()) {
-				in->d_tag = in32.d_tag;
-				in->d_un.d_val = in32.d_un.d_val;
-			} else {
-				in->d_tag = rev_32word(in32.d_tag);
-				in->d_un.d_val = rev_32word(in32.d_un.d_val);
-			}
-		}
-	}
-	return i;
-}
-
 static int
 elfrw_read_Ehdr(FILE *fp, Elf64_Ehdr *in) {
 
@@ -411,8 +382,6 @@ readelfhdr(FILE *fp, Elf64_Ehdr *elffhdr) {
 	return 0;
 }
 
-
-
 static void
 cleanup_libdir(struct libdir_t *ldhead) {
 	struct libdir_t *libdir = NULL;
@@ -547,13 +516,6 @@ add_tok_to_line(char **line, size_t *len, const char *tok) {
 	*len += sprintf(*line + *len, "%s:", tok);
 }
 
-static bool
-who_needed(const char *str) {
-	if (!who_needs.use)
-		return true;
-	return regexec(&who_needs.rex, str, 0, NULL, 0) != REG_NOMATCH;
-}
-
 static int
 handle(struct elffile_t *head, const struct slist_t *fslist) {
 	struct slist_t *lines;
@@ -595,13 +557,29 @@ handle(struct elffile_t *head, const struct slist_t *fslist) {
 			bool match;
 			const char *lib = elf->needed.items[i].str;
 			char dep_lib[PATH_MAX];
+			const char *dep_pkg = NULL;
 
 			match = find_needed(lib, dep_lib, elf, libdirs); 
 
 			if (match && only_missing)
 				continue;
-			if (!who_needed(lib))
+			if (match && (verbose & PR_DEP_PACK)) {
+				const struct slist_item_t *dep;
+				if ((dep = bsearch_slist(dep_lib, fslist))) {
+					dep_pkg = dep->aux;
+				}
+			}
+			if (dep_pkg && no_circular && !strcmp(dep_pkg, elf->pkg))
 				continue;
+			if (who_needs.use) {
+				match = false;
+				if (dep_pkg)
+					match = !regexec(&who_needs.rex, dep_pkg, 0, NULL, 0);
+				if (!match)
+					match = !regexec(&who_needs.rex, dep_lib, 0, NULL, 0);
+				if (!match)
+					continue;
+			}
 
 			if (verbose & PR_OWN_PACK)
 				add_tok_to_line(&line, &len, elf->pkg);
@@ -611,23 +589,15 @@ handle(struct elffile_t *head, const struct slist_t *fslist) {
 				add_tok_to_line(&line, &len, lib);
 			if (verbose & PR_DEP_PATH)
 				add_tok_to_line(&line, &len, dep_lib);
-			if (verbose & PR_DEP_PACK) {
-				const struct slist_item_t *dep;
-				const char *pkg = missing_str;
-				
-				if (match && (dep = bsearch_slist(dep_lib, fslist))) {
-					pkg = dep->aux;
-					if (no_circular && !strcmp(pkg, elf->pkg)
-					 || !who_needed(pkg)) {
-						free(line);
-						continue;
-					}
-				}
-				add_tok_to_line(&line, &len, pkg);
-			}
+			if (verbose & PR_DEP_PACK)
+				add_tok_to_line(&line, &len, dep_pkg);
+
 			if (line && len) {
 				line[len - 1] = '\0';
 				add_to_slist(lines, line, NULL, 1000);
+			} else {
+				/* canthappen */
+				free(line);
 			}
 		}
 	}
@@ -699,125 +669,149 @@ get_proghdrs(FILE *fp, Elf64_Ehdr *elffhdr) {
 	return ret;
 }
 
-static int
-fill_elffile(struct elffile_t *elf, FILE *fp, Elf64_Ehdr *elffhdr, Elf64_Phdr *proghdr) {
+static size_t
+get_dyns(FILE *fp, Elf64_Phdr *proghdr, size_t n_phdrs, Elf64_Dyn **ret_dyns, char **ret_nmstr) {
+	size_t strtab = 0, strsz = 0;
 	Elf64_Dyn *dyns;
+	size_t n_dyns, i;
 	char *nmstr;
-	unsigned long strtab = 0, strsz = 0;
-	int ret = -1;
-	size_t count, i;
 
-	for (i = 0; i < elffhdr->e_phnum; ++i)
+	for (i = 0; i < n_phdrs; ++i)
 		if (proghdr[i].p_type == PT_DYNAMIC)
 			break;
-	if (i == elffhdr->e_phnum)
-		return -1;
+	if (i == n_phdrs)
+		return 0;
 
 	if (fseek(fp, proghdr[i].p_offset, SEEK_SET))
-		return -1;
+		return 0;
 
-	count = proghdr[i].p_filesz / sizeof(Elf64_Dyn);
-	dyns = emalloc(count * sizeof(Elf64_Dyn));
-	count = elfrw_read_Dyns(fp, dyns, count);
-	if (!count) {
-		goto free_dyns;
-	}
-	ret = 0;
-	for (i = 0; i < count; ++i) {
+	n_dyns = proghdr[i].p_filesz / sizeof(Elf64_Dyn);
+	dyns = emalloc(n_dyns * sizeof(Elf64_Dyn));
+
+	for (i = 0; i < n_dyns; ++i) {
+		if (is64bit_form()) {
+			if (1 != fread(&dyns[i], sizeof(Elf64_Dyn), 1, fp))
+				break;
+			if (!native_form()) {
+				revinplc_64xword(&dyns[i].d_tag);
+				revinplc_64xword(&dyns[i].d_un);
+			}
+		} else {
+			Elf32_Dyn in32;
+			if (1 != fread(&in32, sizeof(Elf32_Dyn), 1, fp))
+				break;
+			if (native_form()) {
+				dyns[i].d_tag = in32.d_tag;
+				dyns[i].d_un.d_val = in32.d_un.d_val;
+			} else {
+				dyns[i].d_tag = rev_32word(in32.d_tag);
+				dyns[i].d_un.d_val = rev_32word(in32.d_un.d_val);
+			}
+		}
 		if (dyns[i].d_tag == DT_STRTAB)
 			strtab = dyns[i].d_un.d_ptr;
 		else if (dyns[i].d_tag == DT_STRSZ)
 			strsz = dyns[i].d_un.d_val;
-		else if (dyns[i].d_tag == DT_NEEDED)
-			++ret;
 	}
+
 	if (!strtab || !strsz)
 		goto free_dyns;
-	for (i = 0; i < elffhdr->e_phnum; ++i)
+	for (i = 0; i < n_phdrs; ++i)
 		if (strtab >= proghdr[i].p_vaddr && strtab < proghdr[i].p_vaddr + proghdr[i].p_filesz)
 			break;
-	if (i == elffhdr->e_phnum)
+	if (i == n_phdrs)
 		goto free_dyns;
 	if (!(nmstr = getarea(fp, proghdr[i].p_offset + (strtab - proghdr[i].p_vaddr), strsz)))
 		goto free_dyns;
-	ret = 0;
-	for (i = 0; i < count; ++i) {
-		if (dyns[i].d_tag == DT_RPATH) {
-			char *str = strdup(nmstr + dyns[i].d_un.d_val);
-			char *tok = strtok(str, ":");
 
-			if (!tok)
-				tok = str;
-
-			do {
-				char *abs;
-				if ((abs  = parse_rpath(tok, elf->path))) {
-					add_to_slist(&elf->rpaths, abs, NULL, 100);
-				}
-			} while ((tok = strtok(NULL, ":")));
-
-			free(str);
-
-		} else if (dyns[i].d_tag == DT_NEEDED) {
-			char *str = strdup(nmstr + dyns[i].d_un.d_val);
-			add_to_slist(&elf->needed, str, NULL, 100);
-		}
-	}
-	free(nmstr);
+	*ret_dyns = dyns;
+	*ret_nmstr = nmstr;
+	return n_dyns;
 free_dyns:
 	free(dyns);
-	return ret;
+	*ret_dyns = NULL;
+	*ret_nmstr = NULL;
+	return 0;
 }
+
 
 static struct elffile_t*
 mk_elffile(const char *path) {
-	struct elffile_t *elf;
+	struct elffile_t *elf = NULL;
 	struct stat fs;
 	Elf64_Ehdr elffhdr;
 	Elf64_Phdr *proghdr;
 	FILE *fp;
+	Elf64_Dyn *dyns;
+	size_t n_dyns, i;
+	char *nmstr;
 
-	if (lstat(path, &fs) < 0) {
-		fprintf(stderr, "%s: ERROR: lstat %s: %s\n", argv0, path, strerror(errno));
-		return NULL;
-	} else if ((fs.st_mode & S_IXUSR) == 0) {
+	if (stat(path, &fs) < 0) {
+		fprintf(stderr, "%s: ERROR: stat %s: %s\n", argv0, path, strerror(errno));
 		return NULL;
 	}
-
+	if ((fs.st_mode & S_IXUSR) == 0) {
+		return NULL;
+	}
 	if (!(fp = fopen(path, "rb"))) {
 		fprintf(stderr, "%s: ERROR: fopen %s: %s\n", argv0, path, strerror(errno));
 		return NULL;
 	}
-
 	if (readelfhdr(fp, &elffhdr) < 0 || !(proghdr = get_proghdrs(fp, &elffhdr))) {
 		fclose(fp);
 		return NULL;
 	}
 
-	elf = (struct elffile_t*) ecalloc(1, sizeof(struct elffile_t));
-	elf->ec = elffhdr.e_ident[EI_CLASS] == ELFCLASS32 ? EC_32 : EC_64;
-	elf->path = strdup(path);
+	n_dyns = get_dyns(fp, proghdr, elffhdr.e_phnum, &dyns, &nmstr);
 
-	fill_elffile(elf, fp, &elffhdr, proghdr);
+	if (n_dyns > 0 && dyns && nmstr) {
+		elf = (struct elffile_t*) ecalloc(1, sizeof(struct elffile_t));
+		elf->ec = elffhdr.e_ident[EI_CLASS] == ELFCLASS32 ? EC_32 : EC_64;
+		elf->path = strdup(path);
 
-	sort_slist(&elf->rpaths);
-	sort_slist(&elf->needed);
+		for (i = 0; i < n_dyns; ++i) {
+			if (dyns[i].d_tag == DT_RPATH) {
+				char *str = strdup(nmstr + dyns[i].d_un.d_val);
+				char *tok = strtok(str, ":");
 
+				if (!tok)
+					tok = str;
+
+				do {
+					char *abs;
+					if ((abs  = parse_rpath(tok, elf->path))) {
+						add_to_slist(&elf->rpaths, abs, NULL, 100);
+					}
+				} while ((tok = strtok(NULL, ":")));
+
+				free(str);
+
+			} else if (dyns[i].d_tag == DT_NEEDED) {
+				char *str = strdup(nmstr + dyns[i].d_un.d_val);
+				add_to_slist(&elf->needed, str, NULL, 100);
+			}
+		}
+		sort_slist(&elf->rpaths);
+		sort_slist(&elf->needed);
+	}
 
 	fclose(fp);
 	free(proghdr);
+	free(nmstr);
+	free(dyns);
 
 	return elf;
 }
 
 
 static int
-mcn(const char *path, dev_t rootdev) {
+mcn(const char *path, dev_t rootdev, bool follow_syms) {
 	struct stat fs;
 	int err = 0;
 
-	if (lstat(path, &fs) == -1) {
-		fprintf(stderr, "%s: ERROR: lstat %s: %s\n", argv0, path, strerror(errno));
+	if (follow_syms &&  stat(path, &fs) < 0
+	|| !follow_syms && lstat(path, &fs) < 0) {
+		fprintf(stderr, "%s: ERROR: stat %s: %s\n", argv0, path, strerror(errno));
 		return 1;
 	}
 
@@ -859,7 +853,7 @@ mcn(const char *path, dev_t rootdev) {
 				 !strcmp(path, "/") ? "" : path,
 				 c->d_name, '\0');
 
-			err |= mcn(fullpath, rootdev);
+			err |= mcn(fullpath, rootdev, false);
 		}
 		if (closedir(dp) == -1) {
 			fprintf(stderr, "%s: ERROR: closedir %s: %s\n", argv0, path, strerror(errno));
@@ -881,7 +875,7 @@ mcnx(const char *path) {
 		return -1;
 	}
 
-	return mcn(path, fs.st_dev);
+	return mcn(path, fs.st_dev, true);
 }
 
 
@@ -1014,7 +1008,6 @@ main(int argc, char *argv[]) {
 		exit(1);
 	}
 
-
 	if (verbose & PR_DEP_PACK) {
 		fslist = (struct slist_t*)ecalloc(1, sizeof(struct slist_t));
 		err |= read_adm_dir(adm_dir, NULL, fslist, 0, NULL);
@@ -1078,7 +1071,6 @@ main(int argc, char *argv[]) {
 		head = tmp;
 	}
 
-
 	if (fslist) {
 		cleanup_slist(fslist);
 		free(fslist);
@@ -1090,8 +1082,3 @@ main(int argc, char *argv[]) {
 
 	return err ? 1 : 0;
 }
-
-
-
-
-

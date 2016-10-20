@@ -29,7 +29,6 @@ SH_SRC = \
 
 LIB_SRC = \
 	util/admdir.c	\
-	util/cbn.c	\
 	util/ealloc.c	\
 	util/estrtoul.c	\
 	util/slist.c	\

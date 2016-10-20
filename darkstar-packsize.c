@@ -38,7 +38,6 @@
 #include "util/slist.h"
 #include "util/ealloc.h"
 #include "util/estrtoul.h"
-#include "util/cbn.h"
 
 #include "arg.h"
 
@@ -47,6 +46,7 @@ print_item(const struct slist_item_t *item) {
 	const char prefix[10] = "bkMGTPEZY";
 	off_t val = item->siz;
 	double x;
+	char *bn;
 	int i;
 
 	if (item->siz == (size_t)-1)
@@ -63,8 +63,11 @@ print_item(const struct slist_item_t *item) {
 		printf("%.1f", x);
 	else if (x < 1000.0)
 		printf("%.0f", x);
-		
-	printf("%c\t%s\n", prefix[i], cbn(item->str));
+	
+	bn = strrchr(item->str, '/');
+	bn = bn ? bn + 1 : item->str;
+
+	printf("%c\t%s\n", prefix[i], bn);
 }
 
 static void
@@ -138,11 +141,6 @@ main(int argc, char **argv) {
 	default:
 		usage();
 	} ARGEND;
-
-	if (strstr(cbn(argv0), "last")) {
-		sort = SORT_TIME;
-		limit = 20;
-	}
 
 	list = ecalloc(1, sizeof(struct slist_t));
 	err |= read_adm_dir("/var/log/packages", list, NULL, argc, argv);
