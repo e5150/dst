@@ -78,7 +78,8 @@ struct elffile_t {
 static unsigned verbose;
 
 static const char missing_str[] = "missing";
-static bool search_pkgs = false;
+static bool find_own_pkg = false;
+static bool find_dep_pkg = false;
 static bool no_circular = false;
 static bool recurse = false;
 static bool only_missing = false;
@@ -521,13 +522,13 @@ handle(struct elffile_t *head, const struct slist_t *fslist) {
 	if (verbose == PR_ELF_ONLY) {
 		for (elf = head; elf; elf = elf->next) {
 			for (i = 0; i < elf->rpaths.i; ++i) {
-				if (search_pkgs)
+				if (find_own_pkg)
 					printf("%s:", elf->pkg);
 				printf("%s:", elf->path);
 				printf("rpath:%s\n", elf->rpaths.items[i].str);
 			}
 			for (i = 0; i < elf->needed.i; ++i) {
-				if (search_pkgs)
+				if (find_own_pkg)
 					printf("%s:", elf->pkg);
 				printf("%s:", elf->path);
 				printf("needed:%s\n", elf->needed.items[i].str);
@@ -557,7 +558,7 @@ handle(struct elffile_t *head, const struct slist_t *fslist) {
 
 			if (match && only_missing)
 				continue;
-			if (match && (verbose & PR_DEP_PACK)) {
+			if (match && find_dep_pkg) {
 				const struct slist_item_t *dep;
 				if ((dep = bsearch_slist(dep_lib, fslist))) {
 					dep_pkg = dep->aux;
@@ -910,6 +911,7 @@ int
 main(int argc, char *argv[]) {
 	const char *adm_dir = "/var/log/packages";
 	struct slist_t *fslist = NULL;
+	bool search_pkgs = false;
 	size_t i;
 	int err = 0;
 
@@ -922,6 +924,7 @@ main(int argc, char *argv[]) {
 
 	case 'p':
 		search_pkgs = true;
+		find_own_pkg = true;
 		break;
 
 	case 'm':
@@ -934,9 +937,13 @@ main(int argc, char *argv[]) {
 		break;
 
 	case 'c':
+		find_dep_pkg = true;
 		no_circular = true;
 		break;
 
+	case 'W':
+		find_dep_pkg = true;
+		/* FALLTHOROUGH */
 	case 'w':
 		who_needs.use = true;
 		who_needs.str = EARGF(usage());
@@ -980,6 +987,8 @@ main(int argc, char *argv[]) {
 		break;
 	case 'z':
 		search_pkgs = true;
+		find_own_pkg = true;
+		find_dep_pkg = true;
 		no_circular = true;
 		verbose = PR_OWN_PACK | PR_DEP_PACK;
 		break;
@@ -993,10 +1002,10 @@ main(int argc, char *argv[]) {
 	}
 	ARGEND;
 
-	if (!argc && !search_pkgs)
+	if (!argc && !find_own_pkg)
 		usage();
 
-	if (search_pkgs && recurse)
+	if (find_own_pkg && recurse)
 		usage();
 
 	if (who_needs.use && regcomp(&who_needs.rex, who_needs.str, REG_EXTENDED | REG_NOSUB)) {
@@ -1004,7 +1013,13 @@ main(int argc, char *argv[]) {
 		exit(1);
 	}
 
-	if (verbose & PR_DEP_PACK) {
+	if (verbose & PR_DEP_PACK)
+		find_dep_pkg = true;
+	if (verbose & PR_OWN_PACK)
+		find_own_pkg = true;
+
+	if (find_dep_pkg || find_own_pkg) {
+		find_dep_pkg = true;
 		fslist = (struct slist_t*)ecalloc(1, sizeof(struct slist_t));
 		err |= read_adm_dir(adm_dir, NULL, fslist, 0, NULL);
 
@@ -1038,7 +1053,7 @@ main(int argc, char *argv[]) {
 			err |= mcnx(argv[j]);
 		}
 
-		if (verbose & (PR_DEP_PACK | PR_OWN_PACK)) {
+		if (find_dep_pkg || find_own_pkg) {
 			struct elffile_t *tmp;
 
 			for (tmp = head; tmp; tmp = tmp->next) {

@@ -22,7 +22,7 @@ ARGUMENTS
      -m Only print items that depend on libraries that cannot be located.
 
      -w regex Only print items depending on a library or package matching
-     regex.  (Note: Will only match against the library name, not path.)
+     regex.
 
      -p [pkg ...] Search files owned by the given package(s). If no packages
      are given, all packages are scanned. Basically:
