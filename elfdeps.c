@@ -21,10 +21,6 @@
  * at https://github.com/BR903/ELFkickers
  */
 
-/*
- * configure:EXTRAOPTS=-std=c99
- */
-
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -49,10 +45,8 @@ static struct {
 	enum ec_t ec;
 	const char *path;
 } default_libdirs[] = {
-/*
 	{ EC_64, "/usr/local/lib64" },
 	{ EC_32, "/usr/local/lib" },
-*/
 	{ EC_64, "/lib64" },
 	{ EC_64, "/usr/lib64" },
 	{ EC_32, "/usr/lib" },
@@ -580,6 +574,8 @@ handle(struct elffile_t *head, const struct slist_t *fslist) {
 				if (!match)
 					continue;
 			}
+			if (!dep_pkg)
+				dep_pkg = missing_str;
 
 			if (verbose & PR_OWN_PACK)
 				add_tok_to_line(&line, &len, elf->pkg);
