@@ -411,31 +411,6 @@ readelfhdr(FILE *fp, Elf64_Ehdr *elffhdr) {
 	return 0;
 }
 
-static Elf64_Phdr *
-get_proghdrs(FILE *fp, Elf64_Ehdr *elffhdr) {
-	Elf64_Phdr *ret;
-	int i, n;
-
-	n = elffhdr->e_phnum;
-	ret = emalloc(n * sizeof(Elf64_Phdr));
-
-	if (fseek(fp, elffhdr->e_phoff, SEEK_SET) < 0
-	 || elfrw_read_Phdrs(fp, ret, n) != n) {
-		free(ret);
-		return NULL;
-	}
-	if (elffhdr->e_entry) {
-		for (i = 0; i < n; ++i) {
-			if (ret[i].p_type == PT_LOAD
-			    && elffhdr->e_entry >= ret[i].p_vaddr
-			    && elffhdr->e_entry < ret[i].p_vaddr + ret[i].p_memsz) {
-				break;
-			}
-		}
-	}
-
-	return ret;
-}
 
 
 static void
@@ -564,14 +539,12 @@ add_rpath(const char *path, struct libdir_t *head) {
 	return head;
 }
 
-static char *
-add_tok_to_line(char *line, const char *tok) {
-	size_t len = line ? strlen(line) : 0;
-	size_t new = len + 1 + strlen(tok) + 1;
+static void
+add_tok_to_line(char **line, size_t *len, const char *tok) {
+	size_t new = *len + 1 + strlen(tok) + 1;
 
-	line = erealloc(line, new);
-	sprintf(line + len, "%s:", tok);
-	return line;
+	*line = erealloc(*line, new);
+	*len += sprintf(*line + *len, "%s:", tok);
 }
 
 static bool
@@ -618,6 +591,7 @@ handle(struct elffile_t *head, const struct slist_t *fslist) {
 
 		for (i = 0; i < elf->needed.i; ++i) {
 			char *line = NULL;
+			size_t len = 0;
 			bool match;
 			const char *lib = elf->needed.items[i].str;
 			char dep_lib[PATH_MAX];
@@ -630,46 +604,41 @@ handle(struct elffile_t *head, const struct slist_t *fslist) {
 				continue;
 
 			if (verbose & PR_OWN_PACK)
-				line = add_tok_to_line(line, elf->pkg);
+				add_tok_to_line(&line, &len, elf->pkg);
 			if (verbose & PR_OWN_PATH)
-				line = add_tok_to_line(line, elf->path);
+				add_tok_to_line(&line, &len, elf->path);
 			if (verbose & PR_DTNEEDED)
-				line = add_tok_to_line(line, lib);
+				add_tok_to_line(&line, &len, lib);
 			if (verbose & PR_DEP_PATH)
-				line = add_tok_to_line(line, dep_lib);
+				add_tok_to_line(&line, &len, dep_lib);
 			if (verbose & PR_DEP_PACK) {
+				const struct slist_item_t *dep;
 				const char *pkg = missing_str;
-				if (match) {
-					const struct slist_item_t *dep = bsearch_slist(dep_lib, fslist);
-					if (dep) {
-						pkg = dep->aux;
-						if (no_circular && !strcmp(pkg, elf->pkg)
-						 || !who_needed(pkg)) {
-							free(line);
-							continue;
-						}
+				
+				if (match && (dep = bsearch_slist(dep_lib, fslist))) {
+					pkg = dep->aux;
+					if (no_circular && !strcmp(pkg, elf->pkg)
+					 || !who_needed(pkg)) {
+						free(line);
+						continue;
 					}
 				}
-				line = add_tok_to_line(line, pkg);
+				add_tok_to_line(&line, &len, pkg);
 			}
-			add_to_slist(lines, line, NULL, 1000);
+			if (line && len) {
+				line[len - 1] = '\0';
+				add_to_slist(lines, line, NULL, 1000);
+			}
 		}
 	}
+
 	sort_slist(lines);
+
 	for (i = 0; i < lines->i; ++i) {
 		char *line = lines->items[i].str;
-		size_t len = strlen(line);
-		size_t j;
-		if (!len)
-			continue;
-		for (j = i + 1; j < lines->i; ++j) {
-			if (!strcmp(line, lines->items[j].str)) {
-				++i;
-			} else {
-				break;
-			}
-		}
-		line[len - 1] = '\0';
+
+		while (i + 1 < lines->i && !strcmp(line, lines->items[i + 1].str))
+			++i;
 		puts(line);
 	}
 
@@ -713,6 +682,23 @@ parse_rpath(const char *rpath, const char *elfpath) {
 	return strdup(path);
 }
 
+static Elf64_Phdr *
+get_proghdrs(FILE *fp, Elf64_Ehdr *elffhdr) {
+	Elf64_Phdr *ret;
+	int n;
+
+	n = elffhdr->e_phnum;
+	ret = emalloc(n * sizeof(Elf64_Phdr));
+
+	if (fseek(fp, elffhdr->e_phoff, SEEK_SET) < 0
+	 || elfrw_read_Phdrs(fp, ret, n) != n) {
+		free(ret);
+		return NULL;
+	}
+
+	return ret;
+}
+
 static int
 fill_elffile(struct elffile_t *elf, FILE *fp, Elf64_Ehdr *elffhdr, Elf64_Phdr *proghdr) {
 	Elf64_Dyn *dyns;
@@ -729,6 +715,7 @@ fill_elffile(struct elffile_t *elf, FILE *fp, Elf64_Ehdr *elffhdr, Elf64_Phdr *p
 
 	if (fseek(fp, proghdr[i].p_offset, SEEK_SET))
 		return -1;
+
 	count = proghdr[i].p_filesz / sizeof(Elf64_Dyn);
 	dyns = emalloc(count * sizeof(Elf64_Dyn));
 	count = elfrw_read_Dyns(fp, dyns, count);
@@ -782,8 +769,6 @@ free_dyns:
 	return ret;
 }
 
-
-
 static struct elffile_t*
 mk_elffile(const char *path) {
 	struct elffile_t *elf;
@@ -795,7 +780,7 @@ mk_elffile(const char *path) {
 	if (lstat(path, &fs) < 0) {
 		fprintf(stderr, "%s: ERROR: lstat %s: %s\n", argv0, path, strerror(errno));
 		return NULL;
-	} else if ((fs.st_mode & S_IXUSR) == 0x00) {
+	} else if ((fs.st_mode & S_IXUSR) == 0) {
 		return NULL;
 	}
 
@@ -815,11 +800,12 @@ mk_elffile(const char *path) {
 
 	fill_elffile(elf, fp, &elffhdr, proghdr);
 
-	fclose(fp);
-	free(proghdr);
-
 	sort_slist(&elf->rpaths);
 	sort_slist(&elf->needed);
+
+
+	fclose(fp);
+	free(proghdr);
 
 	return elf;
 }
@@ -901,7 +887,7 @@ mcnx(const char *path) {
 
 static void
 usage() {
-	printf("usage: %s [options] <[-r] file ... | [-c] -p [pkg ...]>\n", argv0);
+	printf("usage: %s [options] <[-r] file ... | -p [pkg ...]>\n", argv0);
 	printf("options:\n"
 	       "\t-p search for content of pkg(s) rather than file(s)\n"
 	       "\t-r recursively search directories on command line\n"
@@ -917,7 +903,7 @@ usage() {
 	       "\t-l|-L print / omit library path\n"
 	       "\t-d|-D print / omit dependant package\n"
 	       "\t-z alias for -pcEod\n"
-	       "\t-v alias for -pcod\n"
+	       "\t-v enable all prints\n"
 	);
 	printf("Defualt output options are: -OfnlD\n");
 	printf("Output format is:\n"
@@ -1002,15 +988,12 @@ main(int argc, char *argv[]) {
 	case 'e':
 		verbose = PR_ELF_ONLY;
 		break;
-
 	case 'z':
 		search_pkgs = true;
 		no_circular = true;
 		verbose = PR_OWN_PACK | PR_DEP_PACK;
 		break;
 	case 'v':
-		search_pkgs = true;
-		no_circular = true;
 		verbose = ~PR_ELF_ONLY;
 		break;
 
@@ -1024,8 +1007,6 @@ main(int argc, char *argv[]) {
 		usage();
 
 	if (search_pkgs && recurse)
-		usage();
-	if (!search_pkgs && no_circular)
 		usage();
 
 	if (who_needs.use && regcomp(&who_needs.rex, who_needs.str, REG_EXTENDED | REG_NOSUB)) {

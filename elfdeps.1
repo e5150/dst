@@ -1,11 +1,11 @@
-.Dd 19th of October 2016
+.Dd 20th of October 2016
 .Dt ELFDEPS 1 darkstar-tools-14.2
 .Sh NAME
 .Nm elfdeps
 .Nd querys ELF files for NEEDED libraries.
 .Sh SYNOPSIS
 .Nm elfdeps
-.Pa options < [-r] file ... | [-c] -p [pkg ...]>
+.Pa options < [-r] file ... | -p [pkg ...]>
 .Sh DESCRIPTION
 .Nm
 scans the dynamic section of an ELF file for DT_NEEDED libraries,
@@ -28,25 +28,25 @@ is either the path to required library or
 .Fl r
 Recursively traverse any directories given on command line.
 
-.Fl m
-Only print items that depend on libraries that cannot be located.
-
-.Fl w
-.Pa regex
-Only print items depending on a library or package matching
-.Pa regex .
-(Note: Will only match against the library name, not path.)
-
 .Fl p 
 .Pa [pkg ...]
 Search files owned by the given package(s). If no packages are given,
 all packages are scanned. Basically:
 .Bd -literal -offset indent
 $ cat /var/log/packages/pkg | xargs elfdeps
-
 .Ed
+
+.Fl m
+Only print items that depend on libraries that cannot be located.
+
 .Fl c
-Do not list packages that depend on themself.
+Do not list (items in) packages that depends on itself.
+
+.Fl w
+.Pa regex
+Only print items depending on a library or package matching
+.Pa regex .
+(Note: Will only match against the library name, not path.)
 
 .Fl o | O
 Print or omit, respectively, the package owning a queried file.
@@ -67,9 +67,18 @@ Print or omit, respectively, the package containing a needed library.
 Print nothing but the DT_RPATH and DT_NEEDED sections of queried file(s).
 (Can otherwise be used to reset the default print flags.)
 
+.Fl q
+Alias for 
+.Fl E .
+
+.Fl v
+Inverse of 
+.Fl E .
+I.e. enable all print options.
+
 .Fl z
 Alias for 
-.Pa -pcEod .
+.Fl pcEod .
 I.e. print only package dependancies, 
 .Pa <pkg-a>:<pkg-b> ,
 where
@@ -80,8 +89,6 @@ and
 .Pa pkg-a
 contains a file dependant on a file contained in
 .Pa pkg-b .
-
-
 .Sh CAVEATS
 .Nm
 does not actually resolve library dependencies, it ignores
