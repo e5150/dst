@@ -66,11 +66,6 @@ CAVEATS
      actually satisfied, but hopefully it should give an accrurate picture in
      most cases.
 
-BUGS
-     DT_RPATH is (allegedly) deprecated, DT_RUNPATH should be queried as well,
-     but isn't.
-
-
 SEE ALSE
      ldd(1), readelf(1), objdump(1), elf(5), ld.so(8),
 

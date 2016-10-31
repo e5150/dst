@@ -767,9 +767,12 @@ mk_elffile(const char *path) {
 		elf->path = strdup(path);
 
 		for (i = 0; i < n_dyns; ++i) {
-			if (dyns[i].d_tag == DT_RPATH) {
-				char *str = strdup(nmstr + dyns[i].d_un.d_val);
-				char *tok = strtok(str, ":");
+			char *str, *tok;
+			switch (dyns[i].d_tag) {
+			case DT_RPATH:
+			case DT_RUNPATH:
+				str = strdup(nmstr + dyns[i].d_un.d_val);
+				tok = strtok(str, ":");
 
 				if (!tok)
 					tok = str;
@@ -782,10 +785,11 @@ mk_elffile(const char *path) {
 				} while ((tok = strtok(NULL, ":")));
 
 				free(str);
-
-			} else if (dyns[i].d_tag == DT_NEEDED) {
-				char *str = strdup(nmstr + dyns[i].d_un.d_val);
+				break;
+			case DT_NEEDED:
+				str = strdup(nmstr + dyns[i].d_un.d_val);
 				add_to_slist(&elf->needed, str, NULL, 100);
+				break;
 			}
 		}
 		sort_slist(&elf->rpaths);
