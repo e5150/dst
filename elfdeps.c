@@ -682,7 +682,10 @@ get_dyns(FILE *fp, Elf64_Phdr *proghdr, size_t n_phdrs, Elf64_Dyn **ret_dyns, ch
 	if (fseek(fp, proghdr[i].p_offset, SEEK_SET))
 		return 0;
 
-	n_dyns = proghdr[i].p_filesz / sizeof(Elf64_Dyn);
+	if (is64bit_form())
+		n_dyns = proghdr[i].p_filesz / sizeof(Elf64_Dyn);
+	else
+		n_dyns = proghdr[i].p_filesz / sizeof(Elf32_Dyn);
 	dyns = emalloc(n_dyns * sizeof(Elf64_Dyn));
 
 	for (i = 0; i < n_dyns; ++i) {
